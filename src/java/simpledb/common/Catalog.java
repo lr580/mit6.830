@@ -8,40 +8,68 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+//import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The Catalog keeps track of all available tables in the database and their
- * associated schemas.
- * For now, this is a stub catalog that must be populated with tables by a
- * user program before it can be used -- eventually, this should be converted
- * to a catalog that reads a catalog table from disk.
+ * associated schemas. For now, this is a stub catalog that must be populated
+ * with tables by a user program before it can be used -- eventually, this
+ * should be converted to a catalog that reads a catalog table from disk.
  *
  * @Threadsafe
  */
 public class Catalog {
 
+    public static class TableItem implements Serializable {
+        private static final long serialVersionUID = 1L;
+        public final DbFile dbFile;
+        public final String name;
+        public final String primaryKey; // pkeyField
+
+        public TableItem(DbFile dbFile, String name, String primaryKey) {
+            this.dbFile = dbFile;
+            this.name = name;
+            this.primaryKey = primaryKey;
+        }
+    }
+
+    private HashMap<Integer, TableItem> tables;
+    private HashMap<String, Integer> name2tableId;
+
     /**
-     * Constructor.
-     * Creates a new, empty catalog.
+     * Constructor. Creates a new, empty catalog.
      */
     public Catalog() {
-        // TODO: some code goes here
+        // DONE: some code goes here
+        tables = new HashMap<>();
+        name2tableId = new HashMap<>();
     }
 
     /**
-     * Add a new table to the catalog.
-     * This table's contents are stored in the specified DbFile.
+     * Add a new table to the catalog. This table's contents are stored in the
+     * specified DbFile.
      *
-     * @param file      the contents of the table to add;  file.getId() is the identfier of
-     *                  this file/tupledesc param for the calls getTupleDesc and getFile
-     * @param name      the name of the table -- may be an empty string.  May not be null.  If a name
-     *                  conflict exists, use the last table to be added as the table for a given name.
+     * @param file      the contents of the table to add; file.getId() is the
+     *                  identfier of this file/tupledesc param for the calls
+     *                  getTupleDesc and getFile
+     * @param name      the name of the table -- may be an empty string. May not be
+     *                  null. If a name conflict exists, use the last table to be
+     *                  added as the table for a given name.
      * @param pkeyField the name of the primary key field
      */
     public void addTable(DbFile file, String name, String pkeyField) {
-        // TODO: some code goes here
+        // DONE: some code goes here
+        Integer tableId = file.getId();
+        if (tables.containsKey(tableId)) {
+            tables.remove(tableId);
+        }
+        if (name2tableId.containsKey(name)) {
+            name2tableId.remove(name);
+        }
+        name2tableId.put(name, tableId);
+        tables.put(tableId, new TableItem(file, name, pkeyField));
     }
 
     public void addTable(DbFile file, String name) {
@@ -49,12 +77,12 @@ public class Catalog {
     }
 
     /**
-     * Add a new table to the catalog.
-     * This table has tuples formatted using the specified TupleDesc and its
-     * contents are stored in the specified DbFile.
+     * Add a new table to the catalog. This table has tuples formatted using the
+     * specified TupleDesc and its contents are stored in the specified DbFile.
      *
-     * @param file the contents of the table to add;  file.getId() is the identfier of
-     *             this file/tupledesc param for the calls getTupleDesc and getFile
+     * @param file the contents of the table to add; file.getId() is the identfier
+     *             of this file/tupledesc param for the calls getTupleDesc and
+     *             getFile
      */
     public void addTable(DbFile file) {
         addTable(file, (UUID.randomUUID()).toString());
@@ -66,8 +94,12 @@ public class Catalog {
      * @throws NoSuchElementException if the table doesn't exist
      */
     public int getTableId(String name) throws NoSuchElementException {
-        // TODO: some code goes here
-        return 0;
+        // DONE: some code goes here
+        Integer id = name2tableId.get(name);
+        if (id == null) {
+            throw new NoSuchElementException();
+        }
+        return id;
     }
 
     /**
@@ -78,46 +110,65 @@ public class Catalog {
      * @throws NoSuchElementException if the table doesn't exist
      */
     public TupleDesc getTupleDesc(int tableid) throws NoSuchElementException {
-        // TODO: some code goes here
-        return null;
+        // DONE: some code goes here
+        TableItem item = tables.get(tableid);
+        if (item == null) {
+            throw new NoSuchElementException();
+        }
+        return item.dbFile.getTupleDesc();
     }
 
     /**
-     * Returns the DbFile that can be used to read the contents of the
-     * specified table.
+     * Returns the DbFile that can be used to read the contents of the specified
+     * table.
      *
      * @param tableid The id of the table, as specified by the DbFile.getId()
      *                function passed to addTable
      */
     public DbFile getDatabaseFile(int tableid) throws NoSuchElementException {
-        // TODO: some code goes here
-        return null;
+        // DONE: some code goes here
+        TableItem item = tables.get(tableid);
+        if (item == null) {
+            throw new NoSuchElementException();
+        }
+        return item.dbFile;
     }
 
     public String getPrimaryKey(int tableid) {
-        // TODO: some code goes here
-        return null;
+        // DONE: some code goes here
+        TableItem item = tables.get(tableid);
+        if (item == null) {
+            throw new NoSuchElementException();
+        }
+        return item.primaryKey;
     }
 
     public Iterator<Integer> tableIdIterator() {
-        // TODO: some code goes here
-        return null;
+        // DONE: some code goes here
+        return tables.keySet().iterator(); // O(1)
     }
 
     public String getTableName(int id) {
-        // TODO: some code goes here
-        return null;
+        // DONE: some code goes here
+        TableItem item = tables.get(id);
+        if (item == null) {
+            throw new NoSuchElementException();
+        }
+        return item.name;
     }
 
     /**
      * Delete all tables from the catalog
      */
     public void clear() {
-        // TODO: some code goes here
+        // DONE: some code goes here
+        name2tableId.clear();
+        tables.clear();
     }
 
     /**
-     * Reads the schema from a file and creates the appropriate tables in the database.
+     * Reads the schema from a file and creates the appropriate tables in the
+     * database.
      *
      * @param catalogFile
      */
@@ -125,12 +176,13 @@ public class Catalog {
         String line = "";
         String baseFolder = new File(new File(catalogFile).getAbsolutePath()).getParent();
         try {
+            @SuppressWarnings("resource")
             BufferedReader br = new BufferedReader(new FileReader(catalogFile));
 
             while ((line = br.readLine()) != null) {
-                //assume line is of the format name (field type, field type, ...)
+                // assume line is of the format name (field type, field type, ...)
                 String name = line.substring(0, line.indexOf("(")).trim();
-                //System.out.println("TABLE NAME: " + name);
+                // System.out.println("TABLE NAME: " + name);
                 String fields = line.substring(line.indexOf("(") + 1, line.indexOf(")")).trim();
                 String[] els = fields.split(",");
                 List<String> names = new ArrayList<>();
@@ -172,4 +224,3 @@ public class Catalog {
         }
     }
 }
-
