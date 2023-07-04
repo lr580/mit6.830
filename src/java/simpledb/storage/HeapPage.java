@@ -7,6 +7,7 @@ import simpledb.common.Debug;
 import simpledb.transaction.TransactionId;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -331,7 +332,14 @@ public class HeapPage implements Page {
      */
     public Iterator<Tuple> iterator() {
         // DONE: some code goes here
-        return Arrays.asList(tuples).iterator();
+//        return Arrays.asList(tuples).iterator();
+        ArrayList<Tuple> nonempty = new ArrayList<>();// 生命周期不会死
+        for (Tuple tuple : tuples) {
+            if (tuple != null) {
+                nonempty.add(tuple);
+            }
+        }
+        return nonempty.iterator();
     }
 
 }
