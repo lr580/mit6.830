@@ -11,15 +11,16 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * BufferPool manages the reading and writing of pages into memory from
- * disk. Access methods call into it to retrieve pages, and it fetches
- * pages from the appropriate location.
+ * BufferPool manages the reading and writing of pages into memory from disk.
+ * Access methods call into it to retrieve pages, and it fetches pages from the
+ * appropriate location.
  * <p>
- * The BufferPool is also responsible for locking;  when a transaction fetches
- * a page, BufferPool checks that the transaction has the appropriate
- * locks to read/write the page.
+ * The BufferPool is also responsible for locking; when a transaction fetches a
+ * page, BufferPool checks that the transaction has the appropriate locks to
+ * read/write the page.
  *
  * @Threadsafe, all fields are final
  */
@@ -32,11 +33,48 @@ public class BufferPool {
     private static int pageSize = DEFAULT_PAGE_SIZE;
 
     /**
-     * Default number of pages passed to the constructor. This is used by
-     * other classes. BufferPool should use the numPages argument to the
-     * constructor instead.
+     * Default number of pages passed to the constructor. This is used by other
+     * classes. BufferPool should use the numPages argument to the constructor
+     * instead.
      */
     public static final int DEFAULT_PAGES = 50;
+
+    private final int numPages;
+    private final ConcurrentHashMap<PageId, Page> pages;
+
+    public static class LRUStrategy {
+        static final AtomicLong nowcnt = new AtomicLong(0);
+
+        public long getNow() {
+            return nowcnt.getAndIncrement();
+        }
+
+        final ConcurrentHashMap<PageId, Long> lastCnt = new ConcurrentHashMap<>();
+
+        public void visitPage(PageId pageId) {
+            lastCnt.put(pageId, getNow());
+        }
+
+        public PageId getLruPageId() {
+            PageId minPage = null;
+            Long minCnt = Long.MAX_VALUE;
+            for (Map.Entry<PageId, Long> pair : lastCnt.entrySet()) {
+                Long cnt = pair.getValue();
+                if (cnt < minCnt) {
+                    minCnt = cnt;
+                    minPage = pair.getKey();
+                }
+            }
+            assert minPage != null;
+            return minPage;
+        }
+
+        public void removePage(PageId pageId) {
+            lastCnt.remove(pageId);
+        }
+    }
+
+    private final LRUStrategy lru;
 
     /**
      * Creates a BufferPool that caches up to numPages pages.
@@ -44,7 +82,10 @@ public class BufferPool {
      * @param numPages maximum number of pages in this buffer pool.
      */
     public BufferPool(int numPages) {
-        // TODO: some code goes here
+        // DONE: some code goes here
+        this.numPages = numPages;
+        pages = new ConcurrentHashMap<>();
+        lru = new LRUStrategy();
     }
 
     public static int getPageSize() {
@@ -62,15 +103,13 @@ public class BufferPool {
     }
 
     /**
-     * Retrieve the specified page with the associated permissions.
-     * Will acquire a lock and may block if that lock is held by another
-     * transaction.
+     * Retrieve the specified page with the associated permissions. Will acquire a
+     * lock and may block if that lock is held by another transaction.
      * <p>
-     * The retrieved page should be looked up in the buffer pool.  If it
-     * is present, it should be returned.  If it is not present, it should
-     * be added to the buffer pool and returned.  If there is insufficient
-     * space in the buffer pool, a page should be evicted and the new page
-     * should be added in its place.
+     * The retrieved page should be looked up in the buffer pool. If it is present,
+     * it should be returned. If it is not present, it should be added to the buffer
+     * pool and returned. If there is insufficient space in the buffer pool, a page
+     * should be evicted and the new page should be added in its place.
      *
      * @param tid  the ID of the transaction requesting the page
      * @param pid  the ID of the requested page
@@ -78,15 +117,27 @@ public class BufferPool {
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
             throws TransactionAbortedException, DbException {
-        // TODO: some code goes here
-        return null;
+        // DONE: some code goes here
+        Page page = pages.get(pid);
+        if (page == null) {
+            synchronized (this) {
+                DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
+                page = file.readPage(pid);
+                while (pages.size() >= numPages) {
+                    evictPage();
+
+                }
+                pages.put(pid, page);
+                lru.visitPage(pid);
+            }
+        }
+        return page;
     }
 
     /**
-     * Releases the lock on a page.
-     * Calling this is very risky, and may result in wrong behavior. Think hard
-     * about who needs to call this and why, and why they can run the risk of
-     * calling it.
+     * Releases the lock on a page. Calling this is very risky, and may result in
+     * wrong behavior. Think hard about who needs to call this and why, and why they
+     * can run the risk of calling it.
      *
      * @param tid the ID of the transaction requesting the unlock
      * @param pid the ID of the page to unlock
@@ -116,8 +167,8 @@ public class BufferPool {
     }
 
     /**
-     * Commit or abort a given transaction; release all locks associated to
-     * the transaction.
+     * Commit or abort a given transaction; release all locks associated to the
+     * transaction.
      *
      * @param tid    the ID of the transaction requesting the unlock
      * @param commit a flag indicating whether we should commit or abort
@@ -128,15 +179,15 @@ public class BufferPool {
     }
 
     /**
-     * Add a tuple to the specified table on behalf of transaction tid.  Will
-     * acquire a write lock on the page the tuple is added to and any other
-     * pages that are updated (Lock acquisition is not needed for lab2).
-     * May block if the lock(s) cannot be acquired.
+     * Add a tuple to the specified table on behalf of transaction tid. Will acquire
+     * a write lock on the page the tuple is added to and any other pages that are
+     * updated (Lock acquisition is not needed for lab2). May block if the lock(s)
+     * cannot be acquired.
      * <p>
-     * Marks any pages that were dirtied by the operation as dirty by calling
-     * their markDirty bit, and adds versions of any pages that have
-     * been dirtied to the cache (replacing any existing versions of those pages) so
-     * that future requests see up-to-date pages.
+     * Marks any pages that were dirtied by the operation as dirty by calling their
+     * markDirty bit, and adds versions of any pages that have been dirtied to the
+     * cache (replacing any existing versions of those pages) so that future
+     * requests see up-to-date pages.
      *
      * @param tid     the transaction adding the tuple
      * @param tableId the table to add the tuple to
@@ -149,14 +200,14 @@ public class BufferPool {
     }
 
     /**
-     * Remove the specified tuple from the buffer pool.
-     * Will acquire a write lock on the page the tuple is removed from and any
-     * other pages that are updated. May block if the lock(s) cannot be acquired.
+     * Remove the specified tuple from the buffer pool. Will acquire a write lock on
+     * the page the tuple is removed from and any other pages that are updated. May
+     * block if the lock(s) cannot be acquired.
      * <p>
-     * Marks any pages that were dirtied by the operation as dirty by calling
-     * their markDirty bit, and adds versions of any pages that have
-     * been dirtied to the cache (replacing any existing versions of those pages) so
-     * that future requests see up-to-date pages.
+     * Marks any pages that were dirtied by the operation as dirty by calling their
+     * markDirty bit, and adds versions of any pages that have been dirtied to the
+     * cache (replacing any existing versions of those pages) so that future
+     * requests see up-to-date pages.
      *
      * @param tid the transaction deleting the tuple.
      * @param t   the tuple to delete
@@ -168,9 +219,8 @@ public class BufferPool {
     }
 
     /**
-     * Flush all dirty pages to disk.
-     * NB: Be careful using this routine -- it writes dirty data to disk so will
-     * break simpledb if running in NO STEAL mode.
+     * Flush all dirty pages to disk. NB: Be careful using this routine -- it writes
+     * dirty data to disk so will break simpledb if running in NO STEAL mode.
      */
     public synchronized void flushAllPages() throws IOException {
         // TODO: some code goes here
@@ -179,13 +229,12 @@ public class BufferPool {
     }
 
     /**
-     * Remove the specific page id from the buffer pool.
-     * Needed by the recovery manager to ensure that the
-     * buffer pool doesn't keep a rolled back page in its
+     * Remove the specific page id from the buffer pool. Needed by the recovery
+     * manager to ensure that the buffer pool doesn't keep a rolled back page in its
      * cache.
      * <p>
-     * Also used by B+ tree files to ensure that deleted pages
-     * are removed from the cache so they can be reused safely
+     * Also used by B+ tree files to ensure that deleted pages are removed from the
+     * cache so they can be reused safely
      */
     public synchronized void removePage(PageId pid) {
         // TODO: some code goes here
@@ -211,12 +260,15 @@ public class BufferPool {
     }
 
     /**
-     * Discards a page from the buffer pool.
-     * Flushes the page to disk to ensure dirty pages are updated on disk.
+     * Discards a page from the buffer pool. Flushes the page to disk to ensure
+     * dirty pages are updated on disk.
      */
     private synchronized void evictPage() throws DbException {
         // TODO: some code goes here
         // not necessary for lab1
+        PageId deletedPageId = lru.getLruPageId();
+        lru.removePage(deletedPageId);
+        pages.remove(deletedPageId);
     }
 
 }
