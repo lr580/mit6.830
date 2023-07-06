@@ -12,6 +12,7 @@
 
 ## 更新日志
 
+- 2023/07/06 30min-1h 完成了 `Lab1.Exercise6`
 - 2023/07/05 2-2.5h 完成了 `Lab1.Exercise3` 和 `Lab1.Exercise5`
 - 2023/07/04 1.5h 完成了 `Lab1.Exercise4`
 - 2023/07/04 1h 实现了 `Catalog` 类，完成 `Lab1.Exercise2`
