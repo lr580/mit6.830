@@ -12,7 +12,8 @@
 
 ## 更新日志
 
-- 2023/07/06 1-2h 完成 `Predicate` 和 `Filter` 类编写并通过对应单元测试
+- 2023/07/07 1h 实现其余要求类，完成了 `Lab2.Exercise1`
+- 2023/07/06 1-2h 实现了 `Predicate` 和 `Filter` 类并通过对应单元测试
 - 2023/07/06 30min-1h 完成了 `Lab1.Exercise6`
 - 2023/07/05 2-2.5h 完成了 `Lab1.Exercise3` 和 `Lab1.Exercise5`
 - 2023/07/04 1.5h 完成了 `Lab1.Exercise4`
