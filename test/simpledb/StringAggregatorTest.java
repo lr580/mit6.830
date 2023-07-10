@@ -60,7 +60,7 @@ public class StringAggregatorTest extends SimpleDbTestBase {
   /**
    * Test StringAggregator.iterator() for OpIterator behaviour
    */
-  @Test public void testIterator() throws Exception {
+   @Test public void testIterator() throws Exception {
     // first, populate the aggregator via sum over scan1
     scan1.open();
     StringAggregator agg = new StringAggregator(0, Type.INT_TYPE, 1, Aggregator.Op.COUNT);

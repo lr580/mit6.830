@@ -141,6 +141,16 @@ public class IntegerAggregator implements Aggregator {
         groups.put(getKey(tup), res);
     }
 
+    public TupleDesc getTupleDesc() {
+        TupleDesc td = null;
+        if (gbfield == NO_GROUPING) {
+            td = new TupleDesc(new Type[] { Type.INT_TYPE });
+        } else {
+            td = new TupleDesc(new Type[] { gbfieldtype, Type.INT_TYPE });
+        }
+        return td;
+    }
+
     /**
      * Create a OpIterator over group aggregate results.
      *
@@ -151,10 +161,7 @@ public class IntegerAggregator implements Aggregator {
      */
     public OpIterator iterator() {
         // DONE: some code goes here
-        TupleDesc td = new TupleDesc(new Type[] { gbfieldtype, Type.INT_TYPE });
-        if (gbfield == NO_GROUPING) {
-            td = new TupleDesc(new Type[] { Type.INT_TYPE });
-        }
+        TupleDesc td = getTupleDesc();
         List<Tuple> res = new ArrayList<>(groups.size());
         for (Map.Entry<Field, Result> it : groups.entrySet()) {
             Tuple tup = new Tuple(td);
@@ -171,18 +178,25 @@ public class IntegerAggregator implements Aggregator {
     }
 
 //    public static void main(String[] args) {
-//        IntegerAggregator ia = new IntegerAggregator(0, Type.INT_TYPE, 1, Op.SUM);
+//        IntegerAggregator ia = new IntegerAggregator(-1, Type.INT_TYPE, 1, Op.AVG);
 //        TupleDesc td = new TupleDesc(new Type[] { Type.INT_TYPE, Type.INT_TYPE });
+//        
 //        Tuple tup1 = new Tuple(td);
 //        tup1.setField(0, new IntField(1));
 //        tup1.setField(1, new IntField(2));
 //        ia.mergeTupleIntoGroup(tup1);
+//        Tuple tup2 = new Tuple(td);
+//        tup1.setField(0, new IntField(1));
+//        tup1.setField(1, new IntField(4));
+//        ia.mergeTupleIntoGroup(tup2);
+//        
 //        OpIterator it = ia.iterator();
 //
 //        try {
 //            for (it.open(); it.hasNext();) {
 //                Tuple tup = it.next();
-//                System.out.println(tup.getField(0) + " " + tup.getField(1));
+////                System.out.println(tup.getField(0) + " " + tup.getField(1));
+//                System.out.println(tup.getField(0));
 //            }
 //        } catch (Exception e) {
 //            e.printStackTrace();

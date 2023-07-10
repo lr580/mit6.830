@@ -12,6 +12,7 @@
 
 ## 更新日志
 
+- 2023/07/10 1.5h 实现其余要求类，完成了 `Lab2.Exercise2`
 - 2023/07/10 2h 实现了 `IntegerAggregator` 类
 - 2023/07/07 1h 实现其余要求类，完成了 `Lab2.Exercise1`
 - 2023/07/06 1-2h 实现了 `Predicate` 和 `Filter` 类并通过对应单元测试
