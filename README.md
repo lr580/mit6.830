@@ -12,6 +12,7 @@
 
 ## 更新日志
 
+- 2023/07/10 2-2.5h 实现了其余要求类，完成了 `Lab2.Exercise3`
 - 2023/07/10 2h 修复一些 bugs，并实现了 `HeapPage` 类
 - 2023/07/10 1.5h 实现其余要求类，完成了 `Lab2.Exercise2`
 - 2023/07/10 2h 实现了 `IntegerAggregator` 类

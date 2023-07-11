@@ -102,6 +102,23 @@ public class BufferPool {
         BufferPool.pageSize = DEFAULT_PAGE_SIZE;
     }
 
+    public void addPage(PageId pid, Page page) {
+        pages.put(pid, page);
+        lru.visitPage(pid);
+    }
+    
+    public void addPage( Page page) {
+        addPage(page.getId(), page);
+    }
+
+    private DbFile getFile(int tableid) {
+        return Database.getCatalog().getDatabaseFile(tableid);
+    }
+
+    private DbFile getFile(PageId pid) {
+        return getFile(pid.getTableId());
+    }
+
     /**
      * Retrieve the specified page with the associated permissions. Will acquire a
      * lock and may block if that lock is held by another transaction.
@@ -117,20 +134,26 @@ public class BufferPool {
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
             throws TransactionAbortedException, DbException {
+        
         // DONE: some code goes here
         Page page = pages.get(pid);
         if (page == null) {
             synchronized (this) {
-                DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
+//                DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
+                DbFile file = getFile(pid);
                 page = file.readPage(pid);
                 while (pages.size() >= numPages) {
                     evictPage();
 
                 }
-                pages.put(pid, page);
-                lru.visitPage(pid);
+                addPage(pid, page);
             }
         }
+//        TransactionId dirtyTid = page.isDirty();
+//        if (dirtyTid != null) {
+//            pages.remove(pid);
+//            getPage(dirtyTid, pid, perm);
+//        }
         return page;
     }
 
@@ -177,6 +200,13 @@ public class BufferPool {
         // TODO: some code goes here
         // not necessary for lab1|lab2
     }
+    
+    private void coverAll(TransactionId tid, List<Page> pages) {
+        for (Page page : pages) {
+            page.markDirty(true, tid);
+            addPage(page);
+        }
+    }
 
     /**
      * Add a tuple to the specified table on behalf of transaction tid. Will acquire
@@ -195,8 +225,9 @@ public class BufferPool {
      */
     public void insertTuple(TransactionId tid, int tableId, Tuple t)
             throws DbException, IOException, TransactionAbortedException {
-        // TODO: some code goes here
+        // DONE: some code goes here
         // not necessary for lab1
+        coverAll(tid, getFile(tableId).insertTuple(tid, t));
     }
 
     /**
@@ -214,8 +245,10 @@ public class BufferPool {
      */
     public void deleteTuple(TransactionId tid, Tuple t)
             throws DbException, IOException, TransactionAbortedException {
-        // TODO: some code goes here
+        // DONE: some code goes here
         // not necessary for lab1
+        int tableId = t.getRecordId().getPageId().getTableId();
+        coverAll(tid, getFile(tableId).deleteTuple(tid, t));
     }
 
     /**
@@ -239,6 +272,18 @@ public class BufferPool {
     public synchronized void removePage(PageId pid) {
         // TODO: some code goes here
         // not necessary for lab1
+        lru.removePage(pid);
+        Page page = pages.get(pid);
+        TransactionId tid = page.isDirty();
+        if (tid != null) {
+            DbFile file = getFile(pid);
+            try {
+                file.writePage(page);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        pages.remove(pid);
     }
 
     /**
@@ -267,8 +312,7 @@ public class BufferPool {
         // TODO: some code goes here
         // not necessary for lab1
         PageId deletedPageId = lru.getLruPageId();
-        lru.removePage(deletedPageId);
-        pages.remove(deletedPageId);
+        removePage(deletedPageId);
     }
 
 }

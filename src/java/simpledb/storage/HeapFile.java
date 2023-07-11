@@ -8,6 +8,7 @@ import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
 import java.io.*;
+import java.util.Arrays;
 //import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -74,10 +75,14 @@ public class HeapFile implements DbFile {
 //        throw new UnsupportedOperationException("implement this");
     }
 
+    private long getOffset(PageId pid) {
+        return pid.getPageNumber() * BufferPool.getPageSize();
+    }
+
     // see DbFile.java for javadocs
     public Page readPage(PageId pid) {
         // DONE: some code goes here
-        long offset = pid.getPageNumber() * BufferPool.getPageSize();
+        long offset = getOffset(pid);
         byte[] data = new byte[BufferPool.getPageSize()];
         try {
             RandomAccessFile file = new RandomAccessFile(f, "r");
@@ -88,15 +93,27 @@ public class HeapFile implements DbFile {
             file.close();
             return new HeapPage((HeapPageId) pid, data);
         } catch (IOException e) {
-//            e.printStackTrace();
+            e.printStackTrace();
             return null;
         }
     }
 
     // see DbFile.java for javadocs
     public void writePage(Page page) throws IOException {
-        // TODO: some code goes here
+        // DONE: some code goes here
         // not necessary for lab1
+        PageId pid = page.getId();
+        long offset = getOffset(pid);
+//        Database.getBufferPool().removePage(page.getId());
+        Database.getBufferPool().addPage(pid, page);
+        try {
+            RandomAccessFile file = new RandomAccessFile(f, "rw");
+            file.seek(offset);
+            file.write(page.getPageData());
+            file.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -108,20 +125,49 @@ public class HeapFile implements DbFile {
         return ((int) f.length() - 1) / BufferPool.getPageSize() + 1;
     }
 
+    private HeapPage getPageFromBuffer(TransactionId tid, int id)
+            throws TransactionAbortedException, DbException {
+        return (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(getId(), id),
+                Permissions.READ_ONLY);
+    }
+
     // see DbFile.java for javadocs
     public List<Page> insertTuple(TransactionId tid, Tuple t)
             throws DbException, IOException, TransactionAbortedException {
-        // TODO: some code goes here
-        return null;
+        // DONE: some code goes here
         // not necessary for lab1
+        for (int i = 0; i < numPages(); ++i) {
+            HeapPage page = getPageFromBuffer(tid, i);
+            if (page.getNumUnusedSlots() <= 0) {
+                continue;
+            }
+            page.insertTuple(t);
+//            page.markDirty(true, tid);
+            return Arrays.asList(new Page[] { page });
+        }
+        HeapPageId newpid = new HeapPageId(getId(), numPages());
+        HeapPage newpage = new HeapPage(newpid, HeapPage.createEmptyPageData());
+        newpage.insertTuple(t);
+        writePage(newpage);
+        return Arrays.asList(new Page[] { newpage });
     }
 
     // see DbFile.java for javadocs
     public List<Page> deleteTuple(TransactionId tid, Tuple t)
             throws DbException, TransactionAbortedException {
-        // TODO: some code goes here
-        return null;
+        // DONE: some code goes here
         // not necessary for lab1
+        for (int i = 0; i < numPages(); ++i) {
+            HeapPage page = getPageFromBuffer(tid, i);
+            try {
+                page.deleteTuple(t);
+//                page.markDirty(true, tid);
+                return Arrays.asList(new Page[] { page });
+            } catch (DbException e) {
+                continue;
+            }
+        }
+        throw new DbException("file " + getId() + " not exist tuple " + t);
     }
 
     // see DbFile.java for javadocs
@@ -139,10 +185,14 @@ public class HeapFile implements DbFile {
                     return;
                 }
 //                Page page = readPage() : no, it will skip buffer
-                HeapPage page = (HeapPage) Database.getBufferPool().getPage(tId,
-                        new HeapPageId(getId(), nowPageNo), Permissions.READ_ONLY);
+//                HeapPage page = (HeapPage) Database.getBufferPool().getPage(tId,
+//                        new HeapPageId(getId(), nowPageNo), Permissions.READ_ONLY);
+                HeapPage page = getPageFromBuffer(tId, nowPageNo);
                 nowPageNo += 1;
                 it = page.iterator();
+                if (it != null && !it.hasNext()) {
+                    readPage();
+                }
             }
 
             @Override
