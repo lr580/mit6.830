@@ -3,12 +3,11 @@ package simpledb.storage;
 import simpledb.common.Catalog;
 import simpledb.common.Database;
 import simpledb.common.DbException;
-import simpledb.common.Debug;
+//import simpledb.common.Debug;
 import simpledb.transaction.TransactionId;
-
 import java.io.*;
 import java.util.ArrayList;
-import java.util.Arrays;
+//import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -261,8 +260,17 @@ public class HeapPage implements Page {
      *                     already empty.
      */
     public void deleteTuple(Tuple t) throws DbException {
-        // TODO: some code goes here
+        // DONE: some code goes here
         // not necessary for lab1
+        for (int i = 0; i < numSlots; ++i) {
+            if (tuples[i] != null && tuples[i].equals(t)) {
+                tuples[i] = null;
+                markSlotUsed(i, false);
+                return;
+            }
+        }
+        throw new DbException(
+                "page " + pid.toString() + " not exist tuple " + t.toString() + " to delete");
     }
 
     /**
@@ -274,17 +282,36 @@ public class HeapPage implements Page {
      *                     mismatch.
      */
     public void insertTuple(Tuple t) throws DbException {
-        // TODO: some code goes here
+        // DONE: some code goes here
         // not necessary for lab1
+        if (getNumUnusedSlots() <= 0) {
+            throw new DbException(
+                    "page " + pid.toString() + " full when insert tuple " + t.toString());
+        }
+        for (int i = 0; i < numSlots; ++i) {
+            if (!isSlotUsed(i)) {
+                t.setRecordId(new RecordId(pid, i));
+                tuples[i] = t;
+                markSlotUsed(i, true);
+                break;
+            }
+        }
     }
+
+    TransactionId dirtyTid = null;
 
     /**
      * Marks this page as dirty/not dirty and record that transaction that did the
      * dirtying
      */
     public void markDirty(boolean dirty, TransactionId tid) {
-        // TODO: some code goes here
+        // DONE: some code goes here
         // not necessary for lab1
+        if (dirty) {
+            dirtyTid = tid;
+        } else {
+            dirtyTid = null;
+        }
     }
 
     /**
@@ -292,9 +319,9 @@ public class HeapPage implements Page {
      * the page is not dirty
      */
     public TransactionId isDirty() {
-        // TODO: some code goes here
+        // DONE: some code goes here
         // Not necessary for lab1
-        return null;
+        return dirtyTid;
     }
 
     /**
@@ -304,7 +331,7 @@ public class HeapPage implements Page {
         // DONE: some code goes here
         int cnt = 0;
         for (byte b : header) {
-            cnt += 8 - Integer.bitCount(b);
+            cnt += 8 - Integer.bitCount(b & 0xff);
         }
         return cnt;
     }
@@ -321,8 +348,11 @@ public class HeapPage implements Page {
      * Abstraction to fill or clear a slot on this page.
      */
     private void markSlotUsed(int i, boolean value) {
-        // TODO: some code goes here
+        // DONE: some code goes here
         // not necessary for lab1
+        if (isSlotUsed(i) != value) {
+            header[i / 8] ^= 1 << (i % 8);
+        }
     }
 
     /**

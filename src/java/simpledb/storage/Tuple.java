@@ -46,13 +46,15 @@ public class Tuple implements Serializable {
         return tupleDesc;
     }
 
+    private RecordId recordId = null;
+
     /**
      * @return The RecordId representing the location of this tuple on disk. May be
      *         null.
      */
     public RecordId getRecordId() {
-        // TODO: some code goes here
-        return null;
+        // DONE: some code goes here
+        return recordId;
     }
 
     /**
@@ -61,7 +63,8 @@ public class Tuple implements Serializable {
      * @param rid the new RecordId for this tuple.
      */
     public void setRecordId(RecordId rid) {
-        // TODO: some code goes here
+        // DONE: some code goes here
+        recordId = rid;
     }
 
     /**
@@ -122,5 +125,22 @@ public class Tuple implements Serializable {
     public void resetTupleDesc(TupleDesc td) {
         // DONE: some code goes here
         tupleDesc = td;// 都说only affecting the TupleDesc了就不动fields了
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null || !(obj instanceof Tuple)) {
+            return false;
+        }
+        Tuple o = (Tuple) obj;
+//        if (!o.getTupleDesc().equals(tupleDesc)) {
+//            return false;
+//        }
+        for (int i = 0; i < tupleDesc.numFields(); ++i) {
+            if (!o.getField(i).equals(getField(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 }
