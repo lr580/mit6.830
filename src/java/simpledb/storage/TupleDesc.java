@@ -51,9 +51,9 @@ public class TupleDesc implements Serializable {
     }
 
     private ArrayList<TDItem> items;
-    private int size; // 预处理
-    private int hashCode; // 预处理
-    private HashMap<String, Integer> name2index; // 预处理
+    private int size;
+    private int hashCode;
+    private HashMap<String, Integer> name2index;
 
     private void init(Type[] typeAr, String[] fieldAr) {
         int n = typeAr.length;

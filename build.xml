@@ -15,7 +15,7 @@
     <property name="compile.debug" value="true"/>
     <property name="test.reports" location="testreport"/>
 
-    <property name="sourceversion" value="11"/>
+    <property name="sourceversion" value="8"/>
 
     <path id="classpath.base">
         <pathelement location="${build.src}"/>

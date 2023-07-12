@@ -60,7 +60,7 @@ public class HeapFile implements DbFile {
      */
     public int getId() {
         // DONE: some code goes here
-        return f.getAbsoluteFile().hashCode();// O(1)µÄgetAbsoluteFile
+        return f.getAbsoluteFile().hashCode();// O(1) getAbsoluteFile
 //        throw new UnsupportedOperationException("implement this");
     }
 

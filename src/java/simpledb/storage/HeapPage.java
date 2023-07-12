@@ -363,7 +363,7 @@ public class HeapPage implements Page {
     public Iterator<Tuple> iterator() {
         // DONE: some code goes here
 //        return Arrays.asList(tuples).iterator();
-        ArrayList<Tuple> nonempty = new ArrayList<>();// 生命周期不会死
+        ArrayList<Tuple> nonempty = new ArrayList<>();
         for (Tuple tuple : tuples) {
             if (tuple != null) {
                 nonempty.add(tuple);

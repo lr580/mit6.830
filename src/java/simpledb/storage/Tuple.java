@@ -29,7 +29,6 @@ public class Tuple implements Serializable {
         tupleDesc = td;
         fields = new ArrayList<>(td.numFields());
         for (int i = 0, n = td.numFields(); i < n; ++i) {
-            // 可以改更优雅，但暂时没必要
             if (td.getFieldType(i) == Type.INT_TYPE) {
                 fields.add(new IntField(0));
             } else {
@@ -124,7 +123,7 @@ public class Tuple implements Serializable {
      */
     public void resetTupleDesc(TupleDesc td) {
         // DONE: some code goes here
-        tupleDesc = td;// 都说only affecting the TupleDesc了就不动fields了
+        tupleDesc = td;// only affecting the TupleDesc
     }
 
     @Override
