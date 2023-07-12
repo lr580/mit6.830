@@ -12,6 +12,7 @@
 
 ## 更新日志
 
+- 2023/07/12 10min 完成了 `Lab2.Exercise5`
 - 2023/07/12 30min 完成了 `Lab2.Exercise4`
 - 2023/07/11 2-2.5h 实现了其余要求类，完成了 `Lab2.Exercise3`
 - 2023/07/11 2h 修复一些 bugs，并实现了 `HeapPage` 类

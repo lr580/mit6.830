@@ -256,9 +256,15 @@ public class BufferPool {
      * dirty data to disk so will break simpledb if running in NO STEAL mode.
      */
     public synchronized void flushAllPages() throws IOException {
-        // TODO: some code goes here
+        // DONE: some code goes here
         // not necessary for lab1
-
+        while(!pages.isEmpty()) {
+            try {
+                evictPage();
+            } catch (DbException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     /**
@@ -271,6 +277,21 @@ public class BufferPool {
      */
     public synchronized void removePage(PageId pid) {
         // TODO: some code goes here
+        // not necessary for lab1
+        try {
+            flushPage(pid);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Flushes a certain page to disk
+     *
+     * @param pid an ID indicating the page to flush
+     */
+    private synchronized void flushPage(PageId pid) throws IOException {
+        // DONE: some code goes here
         // not necessary for lab1
         lru.removePage(pid);
         Page page = pages.get(pid);
@@ -287,16 +308,6 @@ public class BufferPool {
     }
 
     /**
-     * Flushes a certain page to disk
-     *
-     * @param pid an ID indicating the page to flush
-     */
-    private synchronized void flushPage(PageId pid) throws IOException {
-        // TODO: some code goes here
-        // not necessary for lab1
-    }
-
-    /**
      * Write all pages of the specified transaction to disk.
      */
     public synchronized void flushPages(TransactionId tid) throws IOException {
@@ -309,7 +320,7 @@ public class BufferPool {
      * dirty pages are updated on disk.
      */
     private synchronized void evictPage() throws DbException {
-        // TODO: some code goes here
+        // DONE: some code goes here
         // not necessary for lab1
         PageId deletedPageId = lru.getLruPageId();
         removePage(deletedPageId);
