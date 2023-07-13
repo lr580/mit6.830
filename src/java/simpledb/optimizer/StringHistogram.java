@@ -1,12 +1,14 @@
 package simpledb.optimizer;
 
 import simpledb.execution.Predicate;
+import simpledb.execution.Predicate.Op;
+import simpledb.storage.Field;
 
 /**
  * A class to represent a fixed-width histogram over a single String-based
  * field.
  */
-public class StringHistogram {
+public class StringHistogram implements Histogram {
     final IntHistogram hist;
 
     /**
@@ -93,5 +95,21 @@ public class StringHistogram {
      */
     public double avgSelectivity() {
         return hist.avgSelectivity();
+    }
+    
+    private String fetchVal(Field v) {
+        return v.toString();
+    }
+
+    @Override
+    public void addValue(Field v) {
+        // DONE Auto-generated method stub
+        addValue(fetchVal(v));
+    }
+
+    @Override
+    public double estimateSelectivity(Op op, Field v) {
+        // DONE Auto-generated method stub
+        return estimateSelectivity(op, fetchVal(v));
     }
 }

@@ -3,12 +3,14 @@ package simpledb.optimizer;
 import java.util.Arrays;
 
 import simpledb.execution.Predicate;
+import simpledb.execution.Predicate.Op;
+import simpledb.storage.Field;
 
 /**
  * A class to represent a fixed-width histogram over a single integer-based
  * field.
  */
-public class IntHistogram {
+public class IntHistogram implements Histogram {
     private final int cnt[], numb, min, max, w;
     private int ntups;
 
@@ -130,6 +132,22 @@ public class IntHistogram {
         // DONE: some code goes here
         return "IntHistogram NumB=" + numb + ",min=" + min + ",max=" + max + ",cnt="
                 + Arrays.toString(cnt);
+    }
+    
+    private int fetchVal(Field v) {
+        return Integer.parseInt(v.toString());
+    }
+
+    @Override
+    public void addValue(Field v) {
+        // DONE Auto-generated method stub
+        addValue(fetchVal(v));
+    }
+
+    @Override
+    public double estimateSelectivity(Op op, Field v) {
+        // DONE Auto-generated method stub
+        return estimateSelectivity(op, fetchVal(v));
     }
 
 //    public static void main(String[] args) {
