@@ -9,6 +9,8 @@ import simpledb.storage.*;
 //import simpledb.transaction.Transaction;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
+
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -73,6 +75,7 @@ public class TableStats {
     private int ioCostPerPage;
     private DbFile file;
     private Histogram hists[];
+    private ArrayList<Tuple> tuples; // important cache accelerate
 
     /**
      * Create a new TableStats object, that keeps track of statistics on each column
@@ -94,15 +97,20 @@ public class TableStats {
         DbFile file = Database.getCatalog().getDatabaseFile(tableid);
         this.file = file;
         DbFileIterator it = file.iterator(new TransactionId());
+//        SeqScan it = new SeqScan(new TransactionId(), file.getId());
+        tuples = new ArrayList<>();
+//        System.out.println(((HeapFile) file).numPages());
+//        System.out.println("begin");
         try {
             it.open();
             while (it.hasNext()) {
                 ++ntups;
-                it.next();
+                tuples.add(it.next());
             }
         } catch (NoSuchElementException | DbException | TransactionAbortedException e) {
             e.printStackTrace();
         }
+//        System.out.println("end");
 
         this.ioCostPerPage = ioCostPerPage;
         hists = new Histogram[file.getTupleDesc().numFields()];
@@ -125,7 +133,7 @@ public class TableStats {
      */
     public double estimateScanCost() {
         // DONE: some code goes here
-        return ((HeapFile)file).numPages() * ioCostPerPage;
+        return ((HeapFile) file).numPages() * ioCostPerPage;
     }
 
     /**
@@ -165,30 +173,17 @@ public class TableStats {
         Histogram hist = null;
         if (type == Type.INT_TYPE) {
             int minVal = Integer.MAX_VALUE, maxVal = Integer.MIN_VALUE;
-            try {
-                DbFileIterator it = file.iterator(new TransactionId());
-                it.open();
-                while (it.hasNext()) {
-                    Tuple tuple = it.next();
-                    int val = Integer.parseInt(tuple.getField(field).toString());
-                    minVal = Math.min(minVal, val);
-                    maxVal = Math.max(maxVal, val);
-                }
-            } catch (NoSuchElementException | DbException | TransactionAbortedException e) {
-                e.printStackTrace();
+            for (Tuple tuple : tuples) {
+                int val = Integer.parseInt(tuple.getField(field).toString());
+                minVal = Math.min(minVal, val);
+                maxVal = Math.max(maxVal, val);
             }
             hist = new IntHistogram(NUM_HIST_BINS, minVal, maxVal);
         } else {
             hist = new StringHistogram(NUM_HIST_BINS);
         }
-        try {
-            DbFileIterator it = file.iterator(new TransactionId());
-            it.open();
-            while (it.hasNext()) {
-                hist.addValue(it.next().getField(field));
-            }
-        } catch (NoSuchElementException | DbException | TransactionAbortedException e) {
-            e.printStackTrace();
+        for (Tuple tuple : tuples) {
+            hist.addValue(tuple.getField(field));
         }
         hists[field] = hist;
         return hist;

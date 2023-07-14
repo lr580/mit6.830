@@ -1,19 +1,18 @@
 package simpledb.optimizer;
 
-import simpledb.ParsingException;
 import simpledb.common.Database;
+import simpledb.ParsingException;
 import simpledb.execution.*;
-import simpledb.storage.TupleDesc;
-
-import javax.swing.*;
-import javax.swing.tree.DefaultMutableTreeNode;
-import javax.swing.tree.DefaultTreeCellRenderer;
 import java.util.*;
+import javax.swing.*;
+import javax.swing.tree.*;
 
 /**
  * The JoinOptimizer class is responsible for ordering a series of joins
  * optimally, and for selecting the best instantiation of a join for a given
  * logical plan.
+ *
+ *
  */
 public class JoinOptimizer {
     final LogicalPlan p;
@@ -21,7 +20,7 @@ public class JoinOptimizer {
 
     /**
      * Constructor
-     *
+     * 
      * @param p     the logical plan being optimized
      * @param joins the list of joins being performed
      */
@@ -65,7 +64,20 @@ public class JoinOptimizer {
 
         JoinPredicate p = new JoinPredicate(t1id, lj.p, t2id);
 
-        j = new Join(p, plan1, plan2);
+        if (lj.p == Predicate.Op.EQUALS) {
+
+            try {
+                // dynamically load HashEquiJoin -- if it doesn't exist, just
+                // fall back on regular join
+                Class<?> c = Class.forName("simpledb.execution.HashEquiJoin");
+                java.lang.reflect.Constructor<?> ct = c.getConstructors()[0];
+                j = (OpIterator) ct.newInstance(new Object[] { p, plan1, plan2 });
+            } catch (Exception e) {
+                j = new Join(p, plan1, plan2);
+            }
+        } else {
+            j = new Join(p, plan1, plan2);
+        }
 
         return j;
 
@@ -73,13 +85,14 @@ public class JoinOptimizer {
 
     /**
      * Estimate the cost of a join.
-     * <p>
+     * 
      * The cost of the join should be calculated based on the join algorithm (or
      * algorithms) that you implemented for Lab 2. It should be a function of the
      * amount of data that must be read over the course of the query, as well as the
      * number of CPU opertions performed by your join. Assume that the cost of a
      * single predicate application is roughly 1.
      *
+     * 
      * @param j     A LogicalJoinNode representing the join operation being
      *              performed.
      * @param card1 Estimated cardinality of the left-hand side of the query
@@ -97,10 +110,11 @@ public class JoinOptimizer {
             // You do not need to implement proper support for these for Lab 3.
             return card1 + cost1 + cost2;
         } else {
-            // DONE Insert your code here.
+            // Insert your code here.
             // HINT: You may need to use the variable "j" if you implemented
             // a join algorithm that's more complicated than a basic
             // nested-loops join.
+
             return cost1 + card1 * cost2 + card1 * card2;
         }
     }
@@ -108,6 +122,7 @@ public class JoinOptimizer {
     /**
      * Estimate the cardinality of a join. The cardinality of a join is the number
      * of tuples produced by the join.
+     *
      *
      * @param j      A LogicalJoinNode representing the join operation being
      *               performed.
@@ -139,7 +154,7 @@ public class JoinOptimizer {
             boolean t1pkey, boolean t2pkey, Map<String, TableStats> stats,
             Map<String, Integer> tableAliasToId) {
         int card = 1;
-        // DONE: some code goes here
+        // some code goes here
         if (joinOp == Predicate.Op.EQUALS) {
             if (t1pkey && t2pkey) {
                 card = Math.min(card1, card2);
@@ -191,27 +206,64 @@ public class JoinOptimizer {
     }
 
     /**
-     * Compute a logical, reasonably efficient join on the specified tables. See the
-     * Lab 3 description for hints on how this should be implemented.
+     * Compute a logical, reasonably efficient join on the specified tables. See PS4
+     * for hints on how this should be implemented.
+     *
      *
      * @param stats               Statistics for each table involved in the join,
      *                            referenced by base table names, not alias
+     *
+     *
      * @param filterSelectivities Selectivities of the filter predicates on each
      *                            table in the join, referenced by table alias (if
      *                            no alias, the base table name)
+     *
+     *
      * @param explain             Indicates whether your code should explain its
      *                            query plan or simply execute it
+     *
      * @return A List<LogicalJoinNode> that stores joins in the left-deep order in
      *         which they should be executed.
+     *
+     *
      * @throws ParsingException when stats or filter selectivities is missing a
      *                          table in the join, or or when another internal error
      *                          occurs
+     *
+     *
      */
     public List<LogicalJoinNode> orderJoins(Map<String, TableStats> stats,
             Map<String, Double> filterSelectivities, boolean explain) throws ParsingException {
-        // Not necessary for labs 1 and 2.
 
-        // TODO: some code goes here
+        // some code goes here
+        // Replace the following
+        PlanCache planCache = new PlanCache();
+        CostCard bestPlan = null;
+        int n = joins.size();
+        for (int i = 1; i <= n; ++i) {
+            Set<Set<LogicalJoinNode>> subs = enumerateSubsets(joins, i);
+            for (Set<LogicalJoinNode> s : subs) {
+                Double bestCost = Double.MAX_VALUE;
+
+                for (LogicalJoinNode toDelete : s) {
+                    CostCard costCard = computeCostAndCardOfSubplan(stats, filterSelectivities,
+                            toDelete, s, bestCost, planCache);
+                    if (costCard != null && costCard.cost < bestCost) {
+                        bestCost = costCard.cost;
+                        bestPlan = costCard;
+                    }
+                }
+                if (Double.MAX_VALUE != bestCost) {
+                    planCache.addPlan(s, bestCost, bestPlan.card, bestPlan.plan);
+                }
+            }
+        }
+        if (explain && bestPlan != null) {
+            printJoins(bestPlan.plan, planCache, stats, filterSelectivities);
+        }
+        if (bestPlan != null) {
+            return bestPlan.plan;
+        }
         return joins;
     }
 
@@ -222,7 +274,7 @@ public class JoinOptimizer {
      * joinToRemove to joinSet (joinSet should contain joinToRemove), given that all
      * of the subsets of size joinSet.size() - 1 have already been computed and
      * stored in PlanCache pc.
-     *
+     * 
      * @param stats               table stats for all of the tables, referenced by
      *                            table names rather than alias (see
      *                            {@link #orderJoins})
@@ -242,7 +294,6 @@ public class JoinOptimizer {
      * @throws ParsingException when stats, filterSelectivities, or pc object is
      *                          missing tables involved in join
      */
-    @SuppressWarnings("unchecked")
     private CostCard computeCostAndCardOfSubplan(Map<String, TableStats> stats,
             Map<String, Double> filterSelectivities, LogicalJoinNode joinToRemove,
             Set<LogicalJoinNode> joinSet, double bestCostSoFar, PlanCache pc)
@@ -297,7 +348,7 @@ public class JoinOptimizer {
             // estimate cost of right subtree
             if (doesJoin(prevBest, table1Alias)) { // j.t1 is in prevBest
                 t1cost = prevBestCost; // left side just has cost of whatever
-                // left
+                                       // left
                 // subtree is
                 t1card = bestCard;
                 leftPkey = hasPkey(prevBest);
@@ -308,10 +359,10 @@ public class JoinOptimizer {
                                 .estimateTableCardinality(filterSelectivities.get(j.t2Alias));
                 rightPkey = j.t2Alias != null && isPkey(j.t2Alias, j.f2PureName);
             } else if (doesJoin(prevBest, j.t2Alias)) { // j.t2 is in prevbest
-                // (both
+                                                        // (both
                 // shouldn't be)
                 t2cost = prevBestCost; // left side just has cost of whatever
-                // left
+                                       // left
                 // subtree is
                 t2card = bestCard;
                 rightPkey = hasPkey(prevBest);
@@ -365,7 +416,7 @@ public class JoinOptimizer {
 
     /**
      * Return true if field is a primary key of the specified table, false otherwise
-     *
+     * 
      * @param tableAlias The alias of the table in the query
      * @param field      The pure name of the field
      */
@@ -393,7 +444,7 @@ public class JoinOptimizer {
      * Helper function to display a Swing window with a tree representation of the
      * specified list of joins. See {@link #orderJoins}, which may want to call this
      * when the analyze flag is true.
-     *
+     * 
      * @param js            the join plan to visualize
      * @param pc            the PlanCache accumulated whild building the optimal
      *                      plan
