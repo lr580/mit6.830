@@ -42,7 +42,7 @@ public class BufferPool {
     private final int numPages;
     private final ConcurrentHashMap<PageId, Page> pages;
 
-    public class LRUStrategy {
+    private class LRUStrategy {
         final AtomicLong nowcnt = new AtomicLong(0);
 
         public long getNow() {
@@ -74,7 +74,7 @@ public class BufferPool {
             }
             return minPage;
         }
-        
+
         public PageId getAnyLruPageId() throws DbException {
             PageId minPage = null;
             Long minCnt = Long.MAX_VALUE;
@@ -139,7 +139,7 @@ public class BufferPool {
         return getFile(pid.getTableId());
     }
 
-    public static class Locks {
+    private static class Locks {
         // maybe concurrent hash set better
 //        public List<TransactionId> shares = Collections.synchronizedList(new ArrayList<>());
         public Set<TransactionId> shares = ConcurrentHashMap.newKeySet();
@@ -158,13 +158,37 @@ public class BufferPool {
             }
         }
 
+        private boolean getNoExclude(TransactionId tid, Permissions perm) {
+            return exclude == null || exclude.equals(tid);
+        }
+
+        private boolean getNoInclude(TransactionId tid, Permissions perm) {
+            return shares.size() == 0 || (shares.size() == 1 && shares.contains(tid));
+        }
+
         public boolean canAdd(TransactionId tid, Permissions perm) {
-            boolean noExclude = exclude == null || exclude.equals(tid);
+            boolean noExclude = getNoExclude(tid, perm);
             if (perm == Permissions.READ_ONLY) {
                 return noExclude;
             }
-            boolean noShare = shares.size() == 0 || (shares.size() == 1 && shares.contains(tid));
+            boolean noShare = getNoInclude(tid, perm);
             return noExclude && noShare;
+        }
+
+        public List<TransactionId> waitAdd(TransactionId tid, Permissions perm) {
+            ArrayList<TransactionId> ans = new ArrayList<>();
+            boolean noExclude = getNoExclude(tid, perm);
+            if (!noExclude) {
+                ans.add(exclude);
+            }
+            if (perm == Permissions.READ_WRITE) {
+                for (TransactionId tid2 : shares) {
+                    if (!tid.equals(tid2) && tid2 != null) {
+                        ans.add(tid2);
+                    }
+                }
+            }
+            return ans;
         }
 
         public void addLock(TransactionId tid, Permissions perm) {
@@ -184,7 +208,91 @@ public class BufferPool {
         }
     }
 
+//    private final static long MAX_TRANSACTION_TIME = 5000;// ms
+
     private final ConcurrentHashMap<PageId, Locks> pageLocks = new ConcurrentHashMap<>();
+
+    private static class WaitTransaction {
+        public final TransactionId tid;
+        public final PageId pid;
+        public final Permissions perm;
+
+        public WaitTransaction(TransactionId tid, PageId pid, Permissions perm) {
+            this.tid = tid;
+            this.pid = pid;
+            this.perm = perm;
+        }
+    }
+
+    private class DeadLockChecker {
+
+        public final Set<WaitTransaction> waits = ConcurrentHashMap.newKeySet();
+
+        // if not deadlock return null, else any circled transaction
+        public synchronized TransactionId isDeadLock() {
+            // build graph
+            Map<TransactionId, ArrayList<TransactionId>> g = new HashMap<>();
+            Map<TransactionId, Integer> ru = new HashMap<>();
+            for (WaitTransaction wait : waits) {
+                g.put(wait.tid, new ArrayList<>());
+                ru.put(wait.tid, 0);
+            }
+            /*
+             * Map<TransactionId, PageId> holdExclusive = new HashMap<>();
+             * Map<TransactionId, ArrayList<PageId>> holdShares = new HashMap<>(); // build
+             * sources for (Map.Entry<PageId, Locks> pr : pageLocks.entrySet()) { PageId pid
+             * = pr.getKey(); Locks locks = pr.getValue(); if (locks.exclude != null) {
+             * holdExclusive.put(locks.exclude, pid); }
+             * 
+             * for (TransactionId tid : locks.shares) { if (tid == null) { continue; }
+             * ArrayList<PageId> hs = holdShares.get(tid); if (hs == null) {
+             * holdShares.put(tid, new ArrayList<>()); hs = holdShares.get(tid); }
+             * hs.add(pid); } }
+             */
+            // build wait sources graph
+            for (WaitTransaction wait : waits) {
+                Locks locks = pageLocks.get(wait.pid);
+                if (locks == null) { // no occupy
+                    continue;
+                }
+                if (!locks.canAdd(wait.tid, wait.perm)) {
+                    for (TransactionId v : locks.waitAdd(wait.tid, wait.perm)) {
+                        g.get(wait.tid).add(v);
+                        ru.put(v, ru.getOrDefault(v, 0) + 1);
+                    }
+                }
+            }
+            // topo sort
+            Queue<TransactionId> q = new LinkedList<>();
+            for (Map.Entry<TransactionId, Integer> pr : ru.entrySet()) {
+                if (pr.getValue().equals(0)) {
+                    q.add(pr.getKey());
+                }
+            }
+            while (!q.isEmpty()) {
+                TransactionId u = q.poll();
+                for (TransactionId v : g.get(u)) {
+                    ru.put(v, ru.get(v) - 1);
+                    if (ru.get(v).equals(0)) {
+                        q.add(v);
+                    }
+                }
+            }
+            TransactionId dead = null;
+            for (Map.Entry<TransactionId, Integer> pr : ru.entrySet()) {
+                if (!pr.getValue().equals(0)) {
+                    System.out.println("Dead Lock Found");
+                    dead = pr.getKey();
+                    break;
+                }
+            }
+            return dead;
+        }
+    }
+
+    private final DeadLockChecker deadLockChecker = new DeadLockChecker();
+    private final static long MAX_TRANSACTION_TIME = 2000;// ms
+    private final static int WAIT_EPOCH = 100; // ms
 
     /**
      * Retrieve the specified page with the associated permissions. Will acquire a
@@ -204,36 +312,55 @@ public class BufferPool {
         // DONE: some code goes here
         synchronized (this) {
             Locks locks = pageLocks.get(pid);
-            boolean lockOk = locks == null || locks.canAdd(tid, perm);
-            if (!lockOk) {
-//                System.out.println(tid + " " + pid + " " + perm + " fails");
-                throw new TransactionAbortedException();
-            }
             if (locks == null) {
                 pageLocks.put(pid, new Locks());
                 locks = pageLocks.get(pid);
             }
+            WaitTransaction wait = new WaitTransaction(tid, pid, perm);
+            long now = System.currentTimeMillis();
+            while (!locks.canAdd(tid, perm)) {
+                if (System.currentTimeMillis() - now > MAX_TRANSACTION_TIME) {
+                    System.out.println(tid + " " + pid + " " + perm + " fails");
+                    throw new TransactionAbortedException();
+                }
+                deadLockChecker.waits.add(wait);
+                TransactionId dead = deadLockChecker.isDeadLock();
+                if (dead != null) {
+                    transactionComplete(dead, false);
+                }
+                if (locks.canAdd(tid, perm)) {
+                    break;
+                }
+                try {
+                    Thread.sleep(WAIT_EPOCH);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            deadLockChecker.waits.remove(wait);
             locks.addLock(tid, perm);
+            /*
+             * long now = System.currentTimeMillis(); // Object signal = new Object(); while
+             * (!locks.canAdd(tid, perm)) { if (System.currentTimeMillis() - now >
+             * MAX_TRANSACTION_TIME) { System.out.println(tid + " " + pid + " " + perm +
+             * " fails"); throw new TransactionAbortedException(); } // synchronized
+             * (signal) { // try { // signal.wait(); // } catch (InterruptedException e) {
+             * // e.printStackTrace(); // } // } } locks.addLock(tid, perm); // synchronized
+             * (signal) { // signal.notifyAll(); // }
+             */
         }
 
         Page page = pages.get(pid);
         if (page == null) {
             synchronized (this) {
-//                DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
                 DbFile file = getFile(pid);
                 page = file.readPage(pid);
                 while (pages.size() >= numPages) {
                     evictPage();
-
                 }
                 addPage(pid, page);
             }
         }
-//        TransactionId dirtyTid = page.isDirty();
-//        if (dirtyTid != null) {
-//            pages.remove(pid);
-//            getPage(dirtyTid, pid, perm);
-//        }
         return page;
     }
 
@@ -389,7 +516,7 @@ public class BufferPool {
             e.printStackTrace();
         }
     }
-    
+
     private synchronized void deletePage(PageId pid) {
         lru.removePage(pid);
         pages.remove(pid);
