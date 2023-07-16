@@ -42,8 +42,8 @@ public class BufferPool {
     private final int numPages;
     private final ConcurrentHashMap<PageId, Page> pages;
 
-    public static class LRUStrategy {
-        static final AtomicLong nowcnt = new AtomicLong(0);
+    public class LRUStrategy {
+        final AtomicLong nowcnt = new AtomicLong(0);
 
         public long getNow() {
             return nowcnt.getAndIncrement();
@@ -55,7 +55,27 @@ public class BufferPool {
             lastCnt.put(pageId, getNow());
         }
 
-        public PageId getLruPageId() {
+        public PageId getLruPageId() throws DbException {
+            PageId minPage = null;
+            Long minCnt = Long.MAX_VALUE;
+            for (Map.Entry<PageId, Long> pair : lastCnt.entrySet()) {
+                Page page = pages.get(pair.getKey());
+                if (null != page.isDirty()) {
+                    continue;
+                }
+                Long cnt = pair.getValue();
+                if (cnt < minCnt) {
+                    minCnt = cnt;
+                    minPage = pair.getKey();
+                }
+            }
+            if (minPage == null) {
+                throw new DbException("all dirty, no way evict");
+            }
+            return minPage;
+        }
+        
+        public PageId getAnyLruPageId() throws DbException {
             PageId minPage = null;
             Long minCnt = Long.MAX_VALUE;
             for (Map.Entry<PageId, Long> pair : lastCnt.entrySet()) {
@@ -126,11 +146,11 @@ public class BufferPool {
         public TransactionId exclude = null;
 
         public boolean hasLock(TransactionId tid) {
-            return exclude.equals(tid) || shares.contains(tid);
+            return tid.equals(exclude) || shares.contains(tid);
         }
 
         public void removeLock(TransactionId tid) {
-            if (exclude.equals(tid)) {
+            if (tid.equals(exclude)) {
                 exclude = null;
             }
             if (shares.contains(tid)) {
@@ -143,8 +163,7 @@ public class BufferPool {
             if (perm == Permissions.READ_ONLY) {
                 return noExclude;
             }
-            boolean noShare = shares.size() == 0
-                    || (shares.size() == 1 && shares.contains(tid));
+            boolean noShare = shares.size() == 0 || (shares.size() == 1 && shares.contains(tid));
             return noExclude && noShare;
         }
 
@@ -241,9 +260,13 @@ public class BufferPool {
      * @param tid the ID of the transaction requesting the unlock
      */
     public void transactionComplete(TransactionId tid) {
-        // TODO: some code goes here
+        // DONE: some code goes here
         // not necessary for lab1|lab2
-
+        try {
+            flushAllPages();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -264,8 +287,23 @@ public class BufferPool {
      * @param commit a flag indicating whether we should commit or abort
      */
     public void transactionComplete(TransactionId tid, boolean commit) {
-        // TODO: some code goes here
+        // DONE: some code goes here
         // not necessary for lab1|lab2
+        if (commit) {
+            transactionComplete(tid);
+        } else {
+            for (Page page : pages.values()) {
+                TransactionId dirtyTid = page.isDirty();
+                if (dirtyTid != null && dirtyTid.equals(tid)) {
+                    deletePage(page.getId());
+                }
+            }
+        }
+        for (Locks locks : pageLocks.values()) {
+            if (locks != null && locks.hasLock(tid)) {
+                locks.removeLock(tid);
+            }
+        }
     }
 
     private void coverAll(TransactionId tid, List<Page> pages) {
@@ -327,7 +365,7 @@ public class BufferPool {
         // not necessary for lab1
         while (!pages.isEmpty()) {
             try {
-                evictPage();
+                evictPageEvenDirty();
             } catch (DbException e) {
                 e.printStackTrace();
             }
@@ -343,13 +381,18 @@ public class BufferPool {
      * cache so they can be reused safely
      */
     public synchronized void removePage(PageId pid) {
-        // TODO: some code goes here
+        // DONE: some code goes here
         // not necessary for lab1
         try {
             flushPage(pid);
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+    
+    private synchronized void deletePage(PageId pid) {
+        lru.removePage(pid);
+        pages.remove(pid);
     }
 
     /**
@@ -360,7 +403,6 @@ public class BufferPool {
     private synchronized void flushPage(PageId pid) throws IOException {
         // DONE: some code goes here
         // not necessary for lab1
-        lru.removePage(pid);
         Page page = pages.get(pid);
         TransactionId tid = page.isDirty();
         if (tid != null) {
@@ -371,15 +413,26 @@ public class BufferPool {
                 e.printStackTrace();
             }
         }
-        pages.remove(pid);
+        page.markDirty(false, tid);
+        deletePage(pid);
     }
 
     /**
      * Write all pages of the specified transaction to disk.
      */
     public synchronized void flushPages(TransactionId tid) throws IOException {
-        // TODO: some code goes here
+        // DONE: some code goes here
         // not necessary for lab1|lab2
+        for (Page page : pages.values()) {
+            TransactionId dirtyTid = page.isDirty();
+            if (dirtyTid != null && dirtyTid.equals(tid)) {
+                try {
+                    flushPage(page.getId());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 
     /**
@@ -393,4 +446,8 @@ public class BufferPool {
         removePage(deletedPageId);
     }
 
+    private synchronized void evictPageEvenDirty() throws DbException {
+        PageId deletedPageId = lru.getAnyLruPageId();
+        removePage(deletedPageId);
+    }
 }
