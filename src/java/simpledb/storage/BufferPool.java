@@ -2,7 +2,7 @@ package simpledb.storage;
 
 import simpledb.common.Database;
 import simpledb.common.DbException;
-import simpledb.common.DeadlockException;
+//import simpledb.common.DeadlockException;
 import simpledb.common.Permissions;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
@@ -10,7 +10,7 @@ import simpledb.transaction.TransactionId;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+//import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -106,8 +106,8 @@ public class BufferPool {
         pages.put(pid, page);
         lru.visitPage(pid);
     }
-    
-    public void addPage( Page page) {
+
+    public void addPage(Page page) {
         addPage(page.getId(), page);
     }
 
@@ -118,6 +118,54 @@ public class BufferPool {
     private DbFile getFile(PageId pid) {
         return getFile(pid.getTableId());
     }
+
+    public static class Locks {
+        // maybe concurrent hash set better
+//        public List<TransactionId> shares = Collections.synchronizedList(new ArrayList<>());
+        public Set<TransactionId> shares = ConcurrentHashMap.newKeySet();
+        public TransactionId exclude = null;
+
+        public boolean hasLock(TransactionId tid) {
+            return exclude.equals(tid) || shares.contains(tid);
+        }
+
+        public void removeLock(TransactionId tid) {
+            if (exclude.equals(tid)) {
+                exclude = null;
+            }
+            if (shares.contains(tid)) {
+                shares.remove(tid);
+            }
+        }
+
+        public boolean canAdd(TransactionId tid, Permissions perm) {
+            boolean noExclude = exclude == null || exclude.equals(tid);
+            if (perm == Permissions.READ_ONLY) {
+                return noExclude;
+            }
+            boolean noShare = shares.size() == 0
+                    || (shares.size() == 1 && shares.contains(tid));
+            return noExclude && noShare;
+        }
+
+        public void addLock(TransactionId tid, Permissions perm) {
+            if (perm == Permissions.READ_ONLY) {
+                if (exclude != null && exclude.equals(tid)) {
+                    exclude = null;
+                }
+                if (!shares.contains(tid)) {
+                    shares.add(tid);
+                }
+            } else {
+                if (shares.contains(tid)) {
+                    shares.remove(tid);
+                }
+                exclude = tid;
+            }
+        }
+    }
+
+    private final ConcurrentHashMap<PageId, Locks> pageLocks = new ConcurrentHashMap<>();
 
     /**
      * Retrieve the specified page with the associated permissions. Will acquire a
@@ -134,8 +182,21 @@ public class BufferPool {
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
             throws TransactionAbortedException, DbException {
-        
         // DONE: some code goes here
+        synchronized (this) {
+            Locks locks = pageLocks.get(pid);
+            boolean lockOk = locks == null || locks.canAdd(tid, perm);
+            if (!lockOk) {
+//                System.out.println(tid + " " + pid + " " + perm + " fails");
+                throw new TransactionAbortedException();
+            }
+            if (locks == null) {
+                pageLocks.put(pid, new Locks());
+                locks = pageLocks.get(pid);
+            }
+            locks.addLock(tid, perm);
+        }
+
         Page page = pages.get(pid);
         if (page == null) {
             synchronized (this) {
@@ -166,8 +227,12 @@ public class BufferPool {
      * @param pid the ID of the page to unlock
      */
     public void unsafeReleasePage(TransactionId tid, PageId pid) {
-        // TODO: some code goes here
+        // DONE: some code goes here
         // not necessary for lab1|lab2
+        Locks locks = pageLocks.get(pid);
+        if (locks != null) {
+            locks.removeLock(tid);
+        }
     }
 
     /**
@@ -178,15 +243,17 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid) {
         // TODO: some code goes here
         // not necessary for lab1|lab2
+
     }
 
     /**
      * Return true if the specified transaction has a lock on the specified page
      */
     public boolean holdsLock(TransactionId tid, PageId p) {
-        // TODO: some code goes here
+        // DONE: some code goes here
         // not necessary for lab1|lab2
-        return false;
+        Locks locks = pageLocks.get(p);
+        return locks != null && locks.hasLock(tid);
     }
 
     /**
@@ -200,7 +267,7 @@ public class BufferPool {
         // TODO: some code goes here
         // not necessary for lab1|lab2
     }
-    
+
     private void coverAll(TransactionId tid, List<Page> pages) {
         for (Page page : pages) {
             page.markDirty(true, tid);
@@ -258,7 +325,7 @@ public class BufferPool {
     public synchronized void flushAllPages() throws IOException {
         // DONE: some code goes here
         // not necessary for lab1
-        while(!pages.isEmpty()) {
+        while (!pages.isEmpty()) {
             try {
                 evictPage();
             } catch (DbException e) {

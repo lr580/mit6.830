@@ -12,6 +12,7 @@
 
 ## 更新日志
 
+- 2023/07/16 1-1.5h 完成了 `Lab4.Exercise1`
 - 2023/07/14 3h debug, 完成了 `Lab3.Exercise4`
 - 2023/07/14 30min-1h 完成了 `Lab3.Exercise3`
 - 2023/07/13 1h-1.5h 完成了 `Lab3.Exercise2`
