@@ -125,10 +125,14 @@ public class HeapFile implements DbFile {
         return ((int) f.length() - 1) / BufferPool.getPageSize() + 1;
     }
 
+    private HeapPage getPageFromBuffer(TransactionId tid, int id, Permissions perm)
+            throws TransactionAbortedException, DbException {
+        return (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(getId(), id), perm);
+    }
+
     private HeapPage getPageFromBuffer(TransactionId tid, int id)
             throws TransactionAbortedException, DbException {
-        return (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(getId(), id),
-                Permissions.READ_ONLY);
+        return getPageFromBuffer(tid, id, Permissions.READ_ONLY);
     }
 
     // see DbFile.java for javadocs
@@ -137,7 +141,7 @@ public class HeapFile implements DbFile {
         // DONE: some code goes here
         // not necessary for lab1
         for (int i = 0; i < numPages(); ++i) {
-            HeapPage page = getPageFromBuffer(tid, i);
+            HeapPage page = getPageFromBuffer(tid, i, Permissions.READ_WRITE);
             if (page.getNumUnusedSlots() <= 0) {
                 continue;
             }
@@ -158,7 +162,7 @@ public class HeapFile implements DbFile {
         // DONE: some code goes here
         // not necessary for lab1
         for (int i = 0; i < numPages(); ++i) {
-            HeapPage page = getPageFromBuffer(tid, i);
+            HeapPage page = getPageFromBuffer(tid, i, Permissions.READ_WRITE);
             try {
                 page.deleteTuple(t);
 //                page.markDirty(true, tid);

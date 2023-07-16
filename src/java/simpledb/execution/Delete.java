@@ -52,8 +52,7 @@ child.open();
             ++cnt;
             try {
                 Database.getBufferPool().deleteTuple(tid, child.next());
-            } catch (NoSuchElementException | DbException | IOException
-                    | TransactionAbortedException e) {
+            } catch (NoSuchElementException | IOException e) {
                 e.printStackTrace();
             }
         }

@@ -2,15 +2,12 @@ package simpledb.storage;
 
 import simpledb.common.Database;
 import simpledb.common.DbException;
-//import simpledb.common.DeadlockException;
 import simpledb.common.Permissions;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
-
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-//import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -156,6 +153,7 @@ public class BufferPool {
             if (shares.contains(tid)) {
                 shares.remove(tid);
             }
+//            System.out.println("remove " + tid);
         }
 
         private boolean getNoExclude(TransactionId tid, Permissions perm) {
@@ -205,6 +203,7 @@ public class BufferPool {
                 }
                 exclude = tid;
             }
+//            System.out.println("Add " + tid.getId() + " " + perm);
         }
     }
 
@@ -231,24 +230,13 @@ public class BufferPool {
         // if not deadlock return null, else any circled transaction
         public synchronized TransactionId isDeadLock() {
             // build graph
+//            int id = (int) (Math.random() * 100);
             Map<TransactionId, ArrayList<TransactionId>> g = new HashMap<>();
             Map<TransactionId, Integer> ru = new HashMap<>();
             for (WaitTransaction wait : waits) {
                 g.put(wait.tid, new ArrayList<>());
                 ru.put(wait.tid, 0);
             }
-            /*
-             * Map<TransactionId, PageId> holdExclusive = new HashMap<>();
-             * Map<TransactionId, ArrayList<PageId>> holdShares = new HashMap<>(); // build
-             * sources for (Map.Entry<PageId, Locks> pr : pageLocks.entrySet()) { PageId pid
-             * = pr.getKey(); Locks locks = pr.getValue(); if (locks.exclude != null) {
-             * holdExclusive.put(locks.exclude, pid); }
-             * 
-             * for (TransactionId tid : locks.shares) { if (tid == null) { continue; }
-             * ArrayList<PageId> hs = holdShares.get(tid); if (hs == null) {
-             * holdShares.put(tid, new ArrayList<>()); hs = holdShares.get(tid); }
-             * hs.add(pid); } }
-             */
             // build wait sources graph
             for (WaitTransaction wait : waits) {
                 Locks locks = pageLocks.get(wait.pid);
@@ -257,11 +245,21 @@ public class BufferPool {
                 }
                 if (!locks.canAdd(wait.tid, wait.perm)) {
                     for (TransactionId v : locks.waitAdd(wait.tid, wait.perm)) {
+//                        System.out.println(wait.tid.getId() + " -> " + v.getId() + " from " + id);
+                        // double check avoid concurrent problem
+                        if (g.get(wait.tid) == null) {
+                            g.put(wait.tid, new ArrayList<>());
+                            ru.put(wait.tid, 0);
+                        }
                         g.get(wait.tid).add(v);
                         ru.put(v, ru.getOrDefault(v, 0) + 1);
+                        if (g.get(v) == null) {
+                            g.put(v, new ArrayList<>());
+                        }
                     }
                 }
             }
+//            System.out.println(" ----- ");
             // topo sort
             Queue<TransactionId> q = new LinkedList<>();
             for (Map.Entry<TransactionId, Integer> pr : ru.entrySet()) {
@@ -281,8 +279,8 @@ public class BufferPool {
             TransactionId dead = null;
             for (Map.Entry<TransactionId, Integer> pr : ru.entrySet()) {
                 if (!pr.getValue().equals(0)) {
-                    System.out.println("Dead Lock Found");
                     dead = pr.getKey();
+//                    System.out.println("Dead lock found, to kill " + dead.getId());
                     break;
                 }
             }
@@ -310,45 +308,38 @@ public class BufferPool {
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
             throws TransactionAbortedException, DbException {
         // DONE: some code goes here
-        synchronized (this) {
-            Locks locks = pageLocks.get(pid);
-            if (locks == null) {
-                pageLocks.put(pid, new Locks());
-                locks = pageLocks.get(pid);
-            }
-            WaitTransaction wait = new WaitTransaction(tid, pid, perm);
-            long now = System.currentTimeMillis();
-            while (!locks.canAdd(tid, perm)) {
-                if (System.currentTimeMillis() - now > MAX_TRANSACTION_TIME) {
-                    System.out.println(tid + " " + pid + " " + perm + " fails");
-                    throw new TransactionAbortedException();
-                }
-                deadLockChecker.waits.add(wait);
-                TransactionId dead = deadLockChecker.isDeadLock();
-                if (dead != null) {
-                    transactionComplete(dead, false);
-                }
-                if (locks.canAdd(tid, perm)) {
-                    break;
-                }
-                try {
-                    Thread.sleep(WAIT_EPOCH);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-            deadLockChecker.waits.remove(wait);
-            locks.addLock(tid, perm);
-            /*
-             * long now = System.currentTimeMillis(); // Object signal = new Object(); while
-             * (!locks.canAdd(tid, perm)) { if (System.currentTimeMillis() - now >
-             * MAX_TRANSACTION_TIME) { System.out.println(tid + " " + pid + " " + perm +
-             * " fails"); throw new TransactionAbortedException(); } // synchronized
-             * (signal) { // try { // signal.wait(); // } catch (InterruptedException e) {
-             * // e.printStackTrace(); // } // } } locks.addLock(tid, perm); // synchronized
-             * (signal) { // signal.notifyAll(); // }
-             */
+        // can't sync all the steps of locks
+        Locks locks = pageLocks.get(pid);
+        if (locks == null) {
+            pageLocks.put(pid, new Locks());
+            locks = pageLocks.get(pid);
         }
+        WaitTransaction wait = new WaitTransaction(tid, pid, perm);
+        long now = System.currentTimeMillis();
+        while (!locks.canAdd(tid, perm)) {
+            if (System.currentTimeMillis() - now > MAX_TRANSACTION_TIME) {
+//                System.out.println(tid + " " + pid + " " + perm + " fails");
+                throw new TransactionAbortedException();
+            }
+            deadLockChecker.waits.add(wait);
+            TransactionId dead = deadLockChecker.isDeadLock();
+            if (dead != null) {
+//                System.out.println("now is " + tid.getId() + " gonna to kill " + dead.getId());
+//                transactionComplete(dead, false);
+                throw new TransactionAbortedException();
+            }
+            if (locks.canAdd(tid, perm)) {
+                break;
+            }
+            try {
+                Thread.sleep(WAIT_EPOCH);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        deadLockChecker.waits.remove(wait);
+        locks.addLock(tid, perm);
+//        System.out.println("get lock " + tid.getId() + " " + perm);
 
         Page page = pages.get(pid);
         if (page == null) {
@@ -360,6 +351,7 @@ public class BufferPool {
                 }
                 addPage(pid, page);
             }
+//            System.out.println("Read from disk " + tid.getId());
         }
         return page;
     }
@@ -390,7 +382,7 @@ public class BufferPool {
         // DONE: some code goes here
         // not necessary for lab1|lab2
         try {
-            flushAllPages();
+            flushPages(tid);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -406,6 +398,8 @@ public class BufferPool {
         return locks != null && locks.hasLock(tid);
     }
 
+//    private Semaphore semaphore = new Semaphore(1);
+
     /**
      * Commit or abort a given transaction; release all locks associated to the
      * transaction.
@@ -416,9 +410,16 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid, boolean commit) {
         // DONE: some code goes here
         // not necessary for lab1|lab2
+//        try {
+//            semaphore.acquire();
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
         if (commit) {
             transactionComplete(tid);
+//            System.out.println("Complete " + tid.getId());
         } else {
+//            System.out.println("Fail " + tid.getId());
             for (Page page : pages.values()) {
                 TransactionId dirtyTid = page.isDirty();
                 if (dirtyTid != null && dirtyTid.equals(tid)) {
@@ -431,10 +432,16 @@ public class BufferPool {
                 locks.removeLock(tid);
             }
         }
+//        semaphore.release();
     }
 
     private void coverAll(TransactionId tid, List<Page> pages) {
         for (Page page : pages) {
+//            try {
+//                page = getPage(tid, page.getId(), Permissions.READ_WRITE);
+//            } catch (TransactionAbortedException | DbException e) {
+//                e.printStackTrace();
+//            }
             page.markDirty(true, tid);
             addPage(page);
         }
@@ -536,6 +543,7 @@ public class BufferPool {
             DbFile file = getFile(pid);
             try {
                 file.writePage(page);
+//                System.out.println("Write dirty to disk " + tid.getId());
             } catch (IOException e) {
                 e.printStackTrace();
             }

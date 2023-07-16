@@ -56,8 +56,7 @@ public class Insert extends Operator {
             ++cnt;
             try {
                 Database.getBufferPool().insertTuple(tid, tableId, child.next());
-            } catch (NoSuchElementException | DbException | IOException
-                    | TransactionAbortedException e) {
+            } catch (NoSuchElementException | IOException e) {
                 e.printStackTrace();
             }
         }
