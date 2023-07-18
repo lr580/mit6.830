@@ -351,8 +351,9 @@ public class BufferPool {
                 }
                 addPage(pid, page);
             }
-//            System.out.println("Read from disk " + tid.getId());
+//            System.out.println("Read from disk " + pid);
         }
+//        System.out.println("Get page " + pid);
         return page;
     }
 
@@ -526,7 +527,11 @@ public class BufferPool {
     private synchronized void flushPage(PageId pid) throws IOException {
         // DONE: some code goes here
         // not necessary for lab1
+//        System.out.println("Flush page " + pid);
         Page page = pages.get(pid);
+        if (page == null) {// origin not in, nothing to flush
+            return;
+        }
         TransactionId tid = page.isDirty();
         if (tid != null) {
             DbFile file = getFile(pid);

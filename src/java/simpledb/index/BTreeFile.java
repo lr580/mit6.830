@@ -199,12 +199,6 @@ public class BTreeFile implements DbFile {
         if (f == null) {
             return findLeafPage(tid, dirtypages, page.getChildId(0), perm, f);
         }
-        /*
-         * brute force int n = page.getMaxEntries(), r = n; for (int i = 1; i <= n; ++i)
-         * { Field f2 = page.getKey(i); // f2 null regard as infty if (f2 == null ||
-         * f.compare(Predicate.Op.LESS_THAN_OR_EQ, f2)) { // f <= key[i] r = i - 1;
-         * break; } } return findLeafPage(tid, dirtypages, page.getChildId(r), perm, f);
-         */
         int l = 1, r = page.getMaxEntries(), ans = r;
         while (l <= r) {
             int c = (l + r) >> 1;
@@ -260,7 +254,7 @@ public class BTreeFile implements DbFile {
     public BTreeLeafPage splitLeafPage(TransactionId tid, Map<PageId, Page> dirtypages,
             BTreeLeafPage page, Field field)
             throws DbException, IOException, TransactionAbortedException {
-        // TODO: some code goes here
+        // DONE: some code goes here
         //
         // Split the leaf page by adding a new page on the right of the existing
         // page and moving half of the tuples to the new page. Copy the middle key up
@@ -271,8 +265,52 @@ public class BTreeFile implements DbFile {
         // the sibling pointers of all the affected leaf pages. Return the page into
         // which a
         // tuple with the given key field should be inserted.
-        return null;
+              
+        // split tuples into two leaf pages
+        BTreeLeafPage newPage = (BTreeLeafPage) getEmptyPage(tid, dirtypages, BTreePageId.LEAF);
+        int numNewTuples = page.getNumTuples() / 2;
+//        List<Tuple> tuples = new ArrayList<>(numNewTuples);
+        Iterator<Tuple> it = page.reverseIterator();
+//        Tuple mid = null;
+        for (int i = 0; i < numNewTuples && it.hasNext(); ++i) {
+            Tuple tuple = it.next();
+            page.deleteTuple(tuple);
+            newPage.insertTuple(tuple);
+//            mid = tuple;
+        }
+        for (int i = numNewTuples - 1; i >= 0; --i) {
+//            newPage.insertTuple(tuples.get(i));
+        }
 
+        // add key, children to internal page
+        Tuple mid = it.next();
+        Field val = mid.getField(keyField);
+        BTreePageId parentId = page.getParentId();
+        BTreeInternalPage parent = getParentWithEmptySlots(tid, dirtypages, parentId, val);
+        parent.insertEntry(new BTreeEntry(val, page.getId(), newPage.getId()));
+
+        // update siblings using theory of double linked table
+        BTreePageId rightPageId = page.getRightSiblingId();
+        page.setRightSiblingId(newPage.getId());
+        newPage.setLeftSiblingId(page.getId());
+        newPage.setRightSiblingId(rightPageId);
+        if (rightPageId != null) {
+            BTreeLeafPage rightPage = (BTreeLeafPage) getPage(tid, dirtypages, rightPageId,
+                    Permissions.READ_WRITE);
+            rightPage.setLeftSiblingId(newPage.getId());
+        }
+
+        // update parent pointers
+        updateParentPointer(tid, dirtypages, parent.getId(), page.getId());
+        updateParentPointer(tid, dirtypages, parent.getId(), newPage.getId());
+
+        // determined which page contains field
+        if (val.compare(Op.LESS_THAN_OR_EQ, field)) {
+            return newPage;
+        } else {
+            return page;
+        }
+        
     }
 
     /**
@@ -303,7 +341,7 @@ public class BTreeFile implements DbFile {
     public BTreeInternalPage splitInternalPage(TransactionId tid, Map<PageId, Page> dirtypages,
             BTreeInternalPage page, Field field)
             throws DbException, IOException, TransactionAbortedException {
-        // TODO: some code goes here
+        // DONE: some code goes here
         //
         // Split the internal page by adding a new page on the right of the existing
         // page and moving half of the entries to the new page. Push the middle key up
@@ -316,7 +354,39 @@ public class BTreeFile implements DbFile {
         // will be useful here. Return the page into which an entry with the given key
         // field
         // should be inserted.
-        return null;
+        
+        // split page into two pages
+        BTreeInternalPage newPage = (BTreeInternalPage) getEmptyPage(tid, dirtypages,
+                BTreePageId.INTERNAL);
+        int numNewTuples = page.getNumEntries() / 2;
+        Iterator<BTreeEntry> it = page.reverseIterator();
+        BTreeEntry mid = null;
+        for (int i = 0; i < numNewTuples; ++i) {
+            BTreeEntry entry = it.next();
+            page.deleteKeyAndRightChild(entry);
+            newPage.insertEntry(entry);
+        }
+
+        // update its parent
+        mid = it.next();
+        page.deleteKeyAndRightChild(mid);
+        mid.setLeftChild(page.getId());
+        mid.setRightChild(newPage.getId());
+        BTreeInternalPage parent = getParentWithEmptySlots(tid, dirtypages, page.getParentId(),
+                mid.getKey());
+        parent.insertEntry(mid);
+
+        // update parent pointers
+        updateParentPointer(tid, dirtypages, parent.getId(), page.getId());
+        updateParentPointer(tid, dirtypages, parent.getId(), newPage.getId());
+        updateParentPointers(tid, dirtypages, newPage);
+
+        if (mid.getKey().compare(Op.LESS_THAN_OR_EQ, field)) {
+            return newPage;
+        } else {
+            return page;
+        }
+        
     }
 
     /**

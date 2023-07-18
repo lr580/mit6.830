@@ -66,7 +66,6 @@ the first header page. This singleton page is implemented in
 classes, especially `BTreePage`, `BTreeInternalPage` and `BTreeLeafPage`. You
 will need to use these classes in your implementation of the B+Tree.
 
-
 Your first job is to implement the `findLeafPage()` function in
 `BTreeFile.java`. This function is used to find the appropriate leaf page given
 a particular key value, and is used for both searches and inserts. For example,
@@ -80,7 +79,6 @@ should return the first (left) leaf page.
 
 <p align="center"> <img width=500 src="lab5-simple_tree.png"><br> <i>Figure 1: A
 simple B+ Tree with duplicate keys</i> </p>
-
 Your `findLeafPage()` function should recursively search through internal nodes
 until it reaches the leaf page corresponding to the provided key value. In order
 to find the appropriate child page at each step, you should iterate through the
