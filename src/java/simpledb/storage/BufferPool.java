@@ -307,6 +307,8 @@ public class BufferPool {
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
             throws TransactionAbortedException, DbException {
+//        perm = Permissions.READ_WRITE;
+        
         // DONE: some code goes here
         // can't sync all the steps of locks
         Locks locks = pageLocks.get(pid);
@@ -318,20 +320,38 @@ public class BufferPool {
         long now = System.currentTimeMillis();
         while (!locks.canAdd(tid, perm)) {
             if (System.currentTimeMillis() - now > MAX_TRANSACTION_TIME) {
+                System.out.println("Transaction too long " + tid.getId() + " " + pid);
+                deadLockChecker.waits.remove(wait);
                 throw new TransactionAbortedException();
             }
             synchronized (this) {
                 deadLockChecker.waits.add(wait);
                 TransactionId dead = deadLockChecker.isDeadLock();
                 if (dead != null) {
+//                    System.out.println("Dead lock found");
+                    deadLockChecker.waits.remove(wait);
                     throw new TransactionAbortedException();
                 }
                 if (locks.canAdd(tid, perm)) {
                     break;
                 }
             }
+//            deadLockChecker.waits.remove(wait);
+//            throw new TransactionAbortedException();
+            
             try {
                 Thread.sleep(WAIT_EPOCH);
+                /*
+                TransactionId t = locks.exclude;
+                if (t == null && locks.shares.size() > 0) {
+                    t = locks.shares.iterator().next();
+                }
+                if (t != null) {
+                    System.out.println(tid.getId() + " waits for " + t.getId() + " " + pages.get(pid) + " in " + perm);
+                } else {
+                    System.out.println(tid.getId() + " waits for ghost");
+                }
+                */
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -353,7 +373,7 @@ public class BufferPool {
             }
 //            System.out.println("Read from disk " + pid);
         }
-//        System.out.println("Get page " + pid);
+//        System.out.println("Get page " + tid.getId() + " " + perm + " " + page);
         return page;
     }
 
@@ -408,9 +428,10 @@ public class BufferPool {
      * @param tid    the ID of the transaction requesting the unlock
      * @param commit a flag indicating whether we should commit or abort
      */
-    public void transactionComplete(TransactionId tid, boolean commit) {
+    public synchronized void transactionComplete(TransactionId tid, boolean commit) {
         // DONE: some code goes here
         // not necessary for lab1|lab2
+//        System.out.println("Transaction complete " + commit + " " + tid.getId());
         if (commit) {
             transactionComplete(tid);
 //            System.out.println("Complete " + tid.getId());
@@ -537,10 +558,11 @@ public class BufferPool {
             DbFile file = getFile(pid);
             try {
                 file.writePage(page);
-//                System.out.println("Write dirty to disk " + tid.getId());
+//                System.out.println("Write dirty to disk " + page.getId());
             } catch (IOException e) {
                 e.printStackTrace();
             }
+            pageLocks.get(pid).removeLock(tid);
         }
         page.markDirty(false, tid);
         deletePage(pid);

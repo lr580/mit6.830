@@ -688,6 +688,7 @@ public class BTreeUtility {
 
         public void run() {
             try {
+                System.out.println("Insert " + tid.getId());
                 Tuple t = BTreeUtility.getBTreeTuple(tupdata);
                 Database.getBufferPool().insertTuple(tid, bf.getId(), t);
                 Database.getBufferPool().transactionComplete(tid);
@@ -771,6 +772,7 @@ public class BTreeUtility {
 
         public void run() {
             try {
+                System.out.println("Delete " + tid.getId());
                 tuple = insertedTuples.take();
                 if (bf.getTupleDesc().numFields() != tuple.size()) {
                     throw new DbException("tuple desc mismatch");
