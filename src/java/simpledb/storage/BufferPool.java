@@ -320,7 +320,7 @@ public class BufferPool {
         long now = System.currentTimeMillis();
         while (!locks.canAdd(tid, perm)) {
             if (System.currentTimeMillis() - now > MAX_TRANSACTION_TIME) {
-                System.out.println("Transaction too long " + tid.getId() + " " + pid);
+//                System.out.println("Transaction too long " + tid.getId() + " " + pid);
                 deadLockChecker.waits.remove(wait);
                 throw new TransactionAbortedException();
             }

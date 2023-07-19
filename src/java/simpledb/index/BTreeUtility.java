@@ -688,7 +688,7 @@ public class BTreeUtility {
 
         public void run() {
             try {
-                System.out.println("Insert " + tid.getId());
+//                System.out.println("Insert " + tid.getId());
                 Tuple t = BTreeUtility.getBTreeTuple(tupdata);
                 Database.getBufferPool().insertTuple(tid, bf.getId(), t);
                 Database.getBufferPool().transactionComplete(tid);
@@ -780,6 +780,7 @@ public class BTreeUtility {
                 IntField key = new IntField(tuple.get(bf.keyField()));
                 IndexPredicate ipred = new IndexPredicate(Op.EQUALS, key);
                 DbFileIterator it = bf.indexIterator(tid, ipred);
+                System.out.println("Delete step A " + tid.getId());
                 it.open();
                 while (it.hasNext()) {
                     Tuple t = it.next();
@@ -789,10 +790,12 @@ public class BTreeUtility {
                     }
                 }
                 it.close();
+                System.out.println("Delete step B " + tid.getId());
                 Database.getBufferPool().transactionComplete(tid);
                 synchronized (slock) {
                     success = true;
                 }
+                System.out.println("Delete Done " + tid.getId());
             } catch (Exception e) {
                 if (!(e instanceof TransactionAbortedException)) {
                     e.printStackTrace();
