@@ -840,19 +840,19 @@ public class BTreeFile implements DbFile {
     public void stealFromRightInternalPage(TransactionId tid, Map<PageId, Page> dirtypages,
             BTreeInternalPage page, BTreeInternalPage rightSibling, BTreeInternalPage parent,
             BTreeEntry parentEntry) throws DbException, TransactionAbortedException {
-        // TODO: some code goes here
+        // DONE: some code goes here
         // Move some of the entries from the right sibling to the page so
         // that the entries are evenly distributed. Be sure to update
         // the corresponding parent entry. Be sure to update the parent
         // pointers of all children in the entries that were moved.
-
+        
         int pageCnt = page.getNumEntries();
         int siblingCnt = rightSibling.getNumEntries();
         Iterator<BTreeEntry> it = rightSibling.iterator();
         for (; pageCnt < siblingCnt; ++pageCnt, --siblingCnt) {
             BTreeEntry entry = it.next();
             rightSibling.deleteKeyAndLeftChild(entry);
-            BTreeEntry entry2 = new BTreeEntry(parentEntry.getKey(), page.getChildId(pageCnt),
+            BTreeEntry entry2 = new BTreeEntry(parentEntry.getKey(), page.reverseIterator().next().getRightChild(),
                     entry.getLeftChild());
             page.insertEntry(entry2);
             updateParentPointer(tid, dirtypages, page.getId(), entry2.getLeftChild());
@@ -944,7 +944,7 @@ public class BTreeFile implements DbFile {
             BTreeInternalPage leftPage, BTreeInternalPage rightPage, BTreeInternalPage parent,
             BTreeEntry parentEntry) throws DbException, IOException, TransactionAbortedException {
 
-        // TODO: some code goes here
+        // DONE: some code goes here
         //
         // Move all the entries from the right page to the left page, update
         // the parent pointers of the children in the entries that were moved,
@@ -953,8 +953,7 @@ public class BTreeFile implements DbFile {
         // merging -
         // deleteParentEntry() will be useful here
         
-        /*
-        BTreeEntry parentEntry2 = new BTreeEntry(parentEntry.getKey(), leftPage.getChildId(leftPage.getNumEntries()), rightPage.getChildId(0));
+        BTreeEntry parentEntry2 = new BTreeEntry(parentEntry.getKey(), leftPage.reverseIterator().next().getRightChild(), rightPage.getChildId(0));
         leftPage.insertEntry(parentEntry2);
         deleteParentEntry(tid, dirtypages, leftPage, parent, parentEntry);
         
@@ -966,37 +965,10 @@ public class BTreeFile implements DbFile {
         }
 
 //        parent.deleteKeyAndRightChild(parentEntry);
-        setEmptyPage(tid, dirtypages, rightPage.getId().getPageNumber());
-
-        updateParentPointer(tid, dirtypages, parent.getId(), leftPage.getId());
+//        updateParentPointer(tid, dirtypages, parent.getId(), leftPage.getId()); //useless
         updateParentPointers(tid, dirtypages, leftPage);
-        */
         
-        Iterator<BTreeEntry> leftIterator = leftPage.reverseIterator();
-        Iterator<BTreeEntry> rightIterator = rightPage.iterator();
-        BTreeEntry leftLastEntry = leftIterator.next();
-        BTreeEntry rightFirstEntry = rightIterator.next();
-        //2. 将两节点中间的父节点entry插入到左节点，并将其删除
-        BTreeEntry midEntry = new BTreeEntry(parentEntry.getKey(), leftLastEntry.getRightChild(), rightFirstEntry.getLeftChild());
-        leftPage.insertEntry(midEntry);
-        deleteParentEntry(tid,dirtypages,leftPage,parent,parentEntry);
-        //3. 插入右节点的第一个entry
-        rightPage.deleteKeyAndLeftChild(rightFirstEntry);
-        leftPage.insertEntry(rightFirstEntry);
-        //4. 循环插入右节点的entry
-        while(rightIterator.hasNext()){
-            rightFirstEntry = rightIterator.next();
-            rightPage.deleteKeyAndLeftChild(rightFirstEntry);
-            leftPage.insertEntry(rightFirstEntry);
-        }
-        //5. 更新左节点的子节点的父节点指向
-        updateParentPointers(tid,dirtypages,leftPage);
-        //6. 设置空page
-        setEmptyPage(tid,dirtypages,rightPage.getId().getPageNumber());
-        //7. 增加脏页
-        dirtypages.remove(rightPage.getId());
-        dirtypages.put(leftPage.getId(),leftPage);
-        dirtypages.put(parent.getId(),parent);
+        setEmptyPage(tid, dirtypages, rightPage.getId().getPageNumber());
     }
 
     /**
