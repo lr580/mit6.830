@@ -243,6 +243,7 @@ function to help debug your implementation, like we did in
 BTreeFileDeleteTest.java.
 
 **N.B.**
+
 1. The checker method should always pass after initialization of the tree and
    before starting and after completing a full call to key insertion or
    deletion, but not necessarily within internal methods.
