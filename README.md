@@ -12,10 +12,10 @@
 
 ## 更新日志
 
-- 2023/07/09 2-4h debug，修复了一些问题
-- 2023/07/09 30min-1h debug，完成了 `Lab5.Exercise4`
-- 2023/07/09 2-3h debug，完成 `Lab5.Exercise3`
-- 2023/07/08 3-5h debug，完成 `Lab5.Exercise2`
+- 2023/07/19 2-4h debug，修复了一些问题
+- 2023/07/19 30min-1h debug，完成了 `Lab5.Exercise4`
+- 2023/07/19 2-3h debug，完成 `Lab5.Exercise3`
+- 2023/07/18 3-5h debug，完成 `Lab5.Exercise2`
 - 2023/07/17 1.5h 完成 `Lab5.Exercise1`
 - 2023/07/16 30min 修复高并发安全 bug
 - 2023/07/16 2-4h debug，完成了 `Lab4.Exercise5`

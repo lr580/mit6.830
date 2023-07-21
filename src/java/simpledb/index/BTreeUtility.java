@@ -688,7 +688,7 @@ public class BTreeUtility {
 
         public void run() {
             try {
-//                System.out.println("Insert " + tid.getId());
+                System.out.println("Insert " + tid.getId());
                 Tuple t = BTreeUtility.getBTreeTuple(tupdata);
                 Database.getBufferPool().insertTuple(tid, bf.getId(), t);
                 Database.getBufferPool().transactionComplete(tid);
@@ -697,7 +697,9 @@ public class BTreeUtility {
                 synchronized (slock) {
                     success = true;
                 }
+                System.out.println("Insert done " + tid.getId());
             } catch (Exception e) {
+                System.out.println("Insert fail " + tid.getId());
                 if (!(e instanceof TransactionAbortedException)) {
                     e.printStackTrace();
                 }
@@ -783,6 +785,7 @@ public class BTreeUtility {
                 System.out.println("Delete step A " + tid.getId());
                 it.open();
                 while (it.hasNext()) {
+                    System.out.println("Delete step A ing " + tid.getId());
                     Tuple t = it.next();
                     if (tupleToList(t).equals(tuple)) {
                         Database.getBufferPool().deleteTuple(tid, t);
@@ -797,7 +800,9 @@ public class BTreeUtility {
                 }
                 System.out.println("Delete Done " + tid.getId());
             } catch (Exception e) {
+                System.out.println("Delete Fail " + tid.getId());
                 if (!(e instanceof TransactionAbortedException)) {
+                    System.out.println("Something wrong: ");
                     e.printStackTrace();
                 }
                 synchronized (elock) {

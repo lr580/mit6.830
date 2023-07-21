@@ -308,7 +308,7 @@ public class BufferPool {
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
             throws TransactionAbortedException, DbException {
 //        perm = Permissions.READ_WRITE;
-        
+
         // DONE: some code goes here
         // can't sync all the steps of locks
         Locks locks = pageLocks.get(pid);
@@ -328,7 +328,7 @@ public class BufferPool {
                 deadLockChecker.waits.add(wait);
                 TransactionId dead = deadLockChecker.isDeadLock();
                 if (dead != null) {
-//                    System.out.println("Dead lock found");
+                    System.out.println("Dead lock found, to remove " + tid.getId());
                     deadLockChecker.waits.remove(wait);
                     throw new TransactionAbortedException();
                 }
@@ -336,22 +336,26 @@ public class BufferPool {
                     break;
                 }
             }
-//            deadLockChecker.waits.remove(wait);
-//            throw new TransactionAbortedException();
-            
+
             try {
                 Thread.sleep(WAIT_EPOCH);
-                /*
+
                 TransactionId t = locks.exclude;
                 if (t == null && locks.shares.size() > 0) {
                     t = locks.shares.iterator().next();
                 }
                 if (t != null) {
-                    System.out.println(tid.getId() + " waits for " + t.getId() + " " + pages.get(pid) + " in " + perm);
+                    if (null == pages.get(pid)) {
+                        System.out.println(
+                                tid.getId() + " waits for " + t.getId() + " null page in " + perm);
+                    } else {
+                        System.out.println(tid.getId() + " waits for " + t.getId() + " "
+                                + pages.get(pid).getId() + " in " + perm);
+                    }
                 } else {
                     System.out.println(tid.getId() + " waits for ghost");
                 }
-                */
+
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -373,7 +377,7 @@ public class BufferPool {
             }
 //            System.out.println("Read from disk " + pid);
         }
-//        System.out.println("Get page " + tid.getId() + " " + perm + " " + page);
+        System.out.println("Get page " + tid.getId() + " " + perm + " " + page.getId());
         return page;
     }
 
@@ -402,11 +406,7 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid) {
         // DONE: some code goes here
         // not necessary for lab1|lab2
-        try {
-            flushPages(tid);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        transactionComplete(tid, true);
     }
 
     /**
@@ -431,24 +431,38 @@ public class BufferPool {
     public synchronized void transactionComplete(TransactionId tid, boolean commit) {
         // DONE: some code goes here
         // not necessary for lab1|lab2
+
 //        System.out.println("Transaction complete " + commit + " " + tid.getId());
         if (commit) {
-            transactionComplete(tid);
 //            System.out.println("Complete " + tid.getId());
+            try {
+                flushPages(tid);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         } else {
 //            System.out.println("Fail " + tid.getId());
             for (Page page : pages.values()) {
                 TransactionId dirtyTid = page.isDirty();
                 if (dirtyTid != null && dirtyTid.equals(tid)) {
+                    System.out.println("Releaze lock of " + page.getId() + " by " + tid.getId());
                     deletePage(page.getId());
+                    pageLocks.get(page.getId()).removeLock(dirtyTid);
                 }
             }
         }
-        for (Locks locks : pageLocks.values()) {
+        for (Map.Entry<PageId, Locks> pr : pageLocks.entrySet()) {
+            Locks locks = pr.getValue();
             if (locks != null && locks.hasLock(tid)) {
+                System.out.println("Remove lock of " + pr.getKey() + " by " + tid.getId());
                 locks.removeLock(tid);
             }
         }
+//        for (Locks locks : pageLocks.values()) {
+//            if (locks != null && locks.hasLock(tid)) {
+//                locks.removeLock(tid);
+//            }
+//        }
     }
 
     private synchronized void coverAll(TransactionId tid, List<Page> pages) {
@@ -562,6 +576,7 @@ public class BufferPool {
             } catch (IOException e) {
                 e.printStackTrace();
             }
+            System.out.println("Release lock of " + pid + " by " + tid.getId());
             pageLocks.get(pid).removeLock(tid);
         }
         page.markDirty(false, tid);
