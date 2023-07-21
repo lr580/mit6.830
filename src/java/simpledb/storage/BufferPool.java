@@ -326,7 +326,7 @@ public class BufferPool {
                 deadLockChecker.waits.add(wait);
                 TransactionId dead = deadLockChecker.isDeadLock();
                 if (dead != null) {
-                    System.out.println("Dead lock found, to remove " + tid.getId());
+//                    System.out.println("Dead lock found, to remove " + tid.getId());
                     deadLockChecker.waits.remove(wait);
                     throw new TransactionAbortedException();
                 }
@@ -563,6 +563,9 @@ public class BufferPool {
         }
         TransactionId tid = page.isDirty();
         if (tid != null) {
+            Database.getLogFile().logWrite(tid, page.getBeforeImage(), page);
+            Database.getLogFile().force();
+            
             DbFile file = getFile(pid);
             try {
                 file.writePage(page);
@@ -590,6 +593,7 @@ public class BufferPool {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
+                page.setBeforeImage();
             }
         }
     }

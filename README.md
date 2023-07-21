@@ -12,6 +12,7 @@
 
 ## 更新日志
 
+- 2023/07/21 5-8h debug，修复了一些问题
 - 2023/07/19 2-4h debug，修复了一些问题
 - 2023/07/19 30min-1h debug，完成了 `Lab5.Exercise4`
 - 2023/07/19 2-3h debug，完成 `Lab5.Exercise3`
