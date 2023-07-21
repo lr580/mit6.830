@@ -45,8 +45,8 @@ public class BTreeUtility {
     }
 
     /**
-     * @return a Tuple with an IntField for every element of tupdata
-     *         and RecordId(BTreePageId(1, 2, BTreePageId.LEAF), 3)
+     * @return a Tuple with an IntField for every element of tupdata and
+     *         RecordId(BTreePageId(1, 2, BTreePageId.LEAF), 3)
      */
     public static Tuple getBTreeTuple(int[] tupdata) {
         Tuple tup = new Tuple(Utility.getTupleDesc(tupdata.length));
@@ -57,8 +57,8 @@ public class BTreeUtility {
     }
 
     /**
-     * @return a Tuple with an IntField for every element of tupdata
-     *         and RecordId(BTreePageId(1, 2, BTreePageId.LEAF), 3)
+     * @return a Tuple with an IntField for every element of tupdata and
+     *         RecordId(BTreePageId(1, 2, BTreePageId.LEAF), 3)
      */
     public static Tuple getBTreeTuple(List<Integer> tupdata) {
         Tuple tup = new Tuple(Utility.getTupleDesc(tupdata.size()));
@@ -69,8 +69,8 @@ public class BTreeUtility {
     }
 
     /**
-     * @return a Tuple with a 'width' IntFields each with value n and
-     *         with RecordId(BTreePageId(1, 2, BTreePageId.LEAF), 3)
+     * @return a Tuple with a 'width' IntFields each with value n and with
+     *         RecordId(BTreePageId(1, 2, BTreePageId.LEAF), 3)
      */
     public static Tuple getBTreeTuple(int n, int width) {
         Tuple tup = new Tuple(Utility.getTupleDesc(width));
@@ -119,11 +119,11 @@ public class BTreeUtility {
     /**
      * @param columnSpecification Mapping between column index and value.
      */
-    public static BTreeFile createRandomBTreeFile(
-            int columns, int rows, Map<Integer, Integer> columnSpecification,
-            List<List<Integer>> tuples, int keyField)
+    public static BTreeFile createRandomBTreeFile(int columns, int rows,
+            Map<Integer, Integer> columnSpecification, List<List<Integer>> tuples, int keyField)
             throws IOException, DbException, TransactionAbortedException {
-        return createRandomBTreeFile(columns, rows, MAX_RAND_VALUE, columnSpecification, tuples, keyField);
+        return createRandomBTreeFile(columns, rows, MAX_RAND_VALUE, columnSpecification, tuples,
+                keyField);
     }
 
     /**
@@ -140,9 +140,8 @@ public class BTreeUtility {
      * @throws DbException
      * @throws TransactionAbortedException
      */
-    public static BTreeFile createRandomBTreeFile(int columns, int rows,
-                                                  int maxValue, Map<Integer, Integer> columnSpecification,
-                                                  List<List<Integer>> tuples, int keyField)
+    public static BTreeFile createRandomBTreeFile(int columns, int rows, int maxValue,
+            Map<Integer, Integer> columnSpecification, List<List<Integer>> tuples, int keyField)
             throws IOException, DbException, TransactionAbortedException {
 
         if (tuples != null) {
@@ -162,8 +161,8 @@ public class BTreeUtility {
 
         Type[] typeAr = new Type[columns];
         Arrays.fill(typeAr, Type.INT_TYPE);
-        return BTreeFileEncoder.convert(tuples, hFile, bFile, BufferPool.getPageSize(),
-                columns, typeAr, ',', keyField);
+        return BTreeFileEncoder.convert(tuples, hFile, bFile, BufferPool.getPageSize(), columns,
+                typeAr, ',', keyField);
     }
 
     /**
@@ -175,9 +174,8 @@ public class BTreeUtility {
      * @param columnSpecification - optional column specification
      * @param tuples              - list of tuples to return
      */
-    public static void generateRandomTuples(int columns, int rows,
-                                            int maxValue, Map<Integer, Integer> columnSpecification,
-                                            List<List<Integer>> tuples) {
+    public static void generateRandomTuples(int columns, int rows, int maxValue,
+            Map<Integer, Integer> columnSpecification, List<List<Integer>> tuples) {
         generateRandomTuples(columns, rows, 0, maxValue, columnSpecification, tuples);
     }
 
@@ -191,9 +189,8 @@ public class BTreeUtility {
      * @param columnSpecification - optional column specification
      * @param tuples              - list of tuples to return
      */
-    public static void generateRandomTuples(int columns, int rows,
-                                            int minValue, int maxValue, Map<Integer, Integer> columnSpecification,
-                                            List<List<Integer>> tuples) {
+    public static void generateRandomTuples(int columns, int rows, int minValue, int maxValue,
+            Map<Integer, Integer> columnSpecification, List<List<Integer>> tuples) {
 
         Random r = new Random();
 
@@ -203,7 +200,8 @@ public class BTreeUtility {
             for (int j = 0; j < columns; ++j) {
                 // Generate random values, or use the column specification
                 Integer columnValue = null;
-                if (columnSpecification != null) columnValue = columnSpecification.get(j);
+                if (columnSpecification != null)
+                    columnValue = columnSpecification.get(j);
                 if (columnValue == null) {
                     columnValue = r.nextInt(maxValue - minValue) + minValue;
                 }
@@ -224,7 +222,7 @@ public class BTreeUtility {
      * @param keys          - list of keys to return
      */
     public static void generateRandomEntries(int numKeys, int minKey, int maxKey, int minChildPtr,
-                                             List<Integer> childPointers, List<Integer> keys) {
+            List<Integer> childPointers, List<Integer> keys) {
 
         Random r = new Random();
 
@@ -270,7 +268,8 @@ public class BTreeUtility {
      * @param minChildPtr       - the first child pointer
      * @return the list of entries
      */
-    public static List<BTreeEntry> generateRandomEntries(int numKeys, int tableid, int childPageCategory, int minKey, int maxKey, int minChildPtr) {
+    public static List<BTreeEntry> generateRandomEntries(int numKeys, int tableid,
+            int childPageCategory, int minKey, int maxKey, int minChildPtr) {
         List<Integer> keys = new ArrayList<>(numKeys);
         List<Integer> childPointers = new ArrayList<>(numKeys + 1);
         generateRandomEntries(numKeys, minKey, maxKey, minChildPtr, childPointers, keys);
@@ -285,14 +284,16 @@ public class BTreeUtility {
     }
 
     /**
-     * Get the number of tuples that can fit on a page with the specified number of integer fields
+     * Get the number of tuples that can fit on a page with the specified number of
+     * integer fields
      *
      * @param columns - the number of columns
      * @return the number of tuples per page
      */
     public static int getNumTuplesPerPage(int columns) {
         int bytesPerTuple = Type.INT_TYPE.getLen() * columns * 8;
-        return (BufferPool.getPageSize() * 8 - 3 * BTreeLeafPage.INDEX_SIZE * 8) / (bytesPerTuple + 1);
+        return (BufferPool.getPageSize() * 8 - 3 * BTreeLeafPage.INDEX_SIZE * 8)
+                / (bytesPerTuple + 1);
     }
 
     /**
@@ -306,7 +307,8 @@ public class BTreeUtility {
      * @return the leaf page
      * @throws IOException
      */
-    public static BTreeLeafPage createRandomLeafPage(BTreePageId pid, int columns, int keyField, int min, int max) throws IOException {
+    public static BTreeLeafPage createRandomLeafPage(BTreePageId pid, int columns, int keyField,
+            int min, int max) throws IOException {
         int tuplesPerPage = getNumTuplesPerPage(columns);
         return createRandomLeafPage(pid, columns, keyField, tuplesPerPage, min, max);
     }
@@ -323,10 +325,12 @@ public class BTreeUtility {
      * @return the leaf page
      * @throws IOException
      */
-    public static BTreeLeafPage createRandomLeafPage(BTreePageId pid, int columns, int keyField, int numTuples, int min, int max) throws IOException {
+    public static BTreeLeafPage createRandomLeafPage(BTreePageId pid, int columns, int keyField,
+            int numTuples, int min, int max) throws IOException {
         Type[] typeAr = new Type[columns];
         Arrays.fill(typeAr, Type.INT_TYPE);
-        byte[] data = BTreeFileEncoder.convertToLeafPage(BTreeUtility.generateRandomTuples(columns, numTuples, min, max),
+        byte[] data = BTreeFileEncoder.convertToLeafPage(
+                BTreeUtility.generateRandomTuples(columns, numTuples, min, max),
                 BufferPool.getPageSize(), columns, typeAr, keyField);
         return new BTreeLeafPage(pid, data, keyField);
     }
@@ -340,7 +344,8 @@ public class BTreeUtility {
         int nentrybytes = Type.INT_TYPE.getLen() + BTreeInternalPage.INDEX_SIZE;
         // pointerbytes: one extra child pointer, parent pointer, child page category
         int internalpointerbytes = 2 * BTreeLeafPage.INDEX_SIZE + 1;
-        return (BufferPool.getPageSize() * 8 - internalpointerbytes * 8 - 1) / (nentrybytes * 8 + 1);
+        return (BufferPool.getPageSize() * 8 - internalpointerbytes * 8 - 1)
+                / (nentrybytes * 8 + 1);
     }
 
     /**
@@ -355,9 +360,11 @@ public class BTreeUtility {
      * @return the internal page
      * @throws IOException
      */
-    public static BTreeInternalPage createRandomInternalPage(BTreePageId pid, int keyField, int childPageCategory, int minKey, int maxKey, int minChildPtr) throws IOException {
+    public static BTreeInternalPage createRandomInternalPage(BTreePageId pid, int keyField,
+            int childPageCategory, int minKey, int maxKey, int minChildPtr) throws IOException {
         int entriesPerPage = getNumEntriesPerPage();
-        return createRandomInternalPage(pid, keyField, childPageCategory, entriesPerPage, minKey, maxKey, minChildPtr);
+        return createRandomInternalPage(pid, keyField, childPageCategory, entriesPerPage, minKey,
+                maxKey, minChildPtr);
     }
 
     /**
@@ -373,8 +380,12 @@ public class BTreeUtility {
      * @return the internal page
      * @throws IOException
      */
-    public static BTreeInternalPage createRandomInternalPage(BTreePageId pid, int keyField, int childPageCategory, int numKeys, int minKey, int maxKey, int minChildPtr) throws IOException {
-        byte[] data = BTreeFileEncoder.convertToInternalPage(BTreeUtility.generateRandomEntries(numKeys, pid.getTableId(), childPageCategory, minKey, maxKey, minChildPtr),
+    public static BTreeInternalPage createRandomInternalPage(BTreePageId pid, int keyField,
+            int childPageCategory, int numKeys, int minKey, int maxKey, int minChildPtr)
+            throws IOException {
+        byte[] data = BTreeFileEncoder.convertToInternalPage(
+                BTreeUtility.generateRandomEntries(numKeys, pid.getTableId(), childPageCategory,
+                        minKey, maxKey, minChildPtr),
                 BufferPool.getPageSize(), Type.INT_TYPE, childPageCategory);
         return new BTreeInternalPage(pid, data, keyField);
     }
@@ -393,8 +404,7 @@ public class BTreeUtility {
      * @throws TransactionAbortedException
      */
     public static BTreeFile createBTreeFile(int columns, int rows,
-                                            Map<Integer, Integer> columnSpecification,
-                                            List<List<Integer>> tuples, int keyField)
+            Map<Integer, Integer> columnSpecification, List<List<Integer>> tuples, int keyField)
             throws IOException, DbException, TransactionAbortedException {
         if (tuples != null) {
             tuples.clear();
@@ -408,7 +418,8 @@ public class BTreeUtility {
             for (int j = 0; j < columns; ++j) {
                 // Generate values, or use the column specification
                 Integer columnValue = null;
-                if (columnSpecification != null) columnValue = columnSpecification.get(j);
+                if (columnSpecification != null)
+                    columnValue = columnSpecification.get(j);
                 if (columnValue == null) {
                     columnValue = (i + 1) * (j + 1);
                 }
@@ -426,8 +437,8 @@ public class BTreeUtility {
 
         Type[] typeAr = new Type[columns];
         Arrays.fill(typeAr, Type.INT_TYPE);
-        return BTreeFileEncoder.convert(tuples, hFile, bFile, BufferPool.getPageSize(),
-                columns, typeAr, ',', keyField);
+        return BTreeFileEncoder.convert(tuples, hFile, bFile, BufferPool.getPageSize(), columns,
+                typeAr, ',', keyField);
     }
 
     /**
@@ -455,10 +466,10 @@ public class BTreeUtility {
     }
 
     /**
-     * A utility method to create a new BTreeFile with no data,
-     * assuming the path does not already exist. If the path exists, the file
-     * will be overwritten. The new table will be added to the Catalog with
-     * the specified number of columns as IntFields indexed on the keyField.
+     * A utility method to create a new BTreeFile with no data, assuming the path
+     * does not already exist. If the path exists, the file will be overwritten. The
+     * new table will be added to the Catalog with the specified number of columns
+     * as IntFields indexed on the keyField.
      */
     public static BTreeFile createEmptyBTreeFile(String path, int cols, int keyField)
             throws IOException {
@@ -473,15 +484,15 @@ public class BTreeUtility {
 
     /**
      * A utility method to create a new BTreeFile with no data, with the specified
-     * number of pages, assuming the path does not already exist. If the path exists,
-     * the file will be overwritten. The new table will be added to the Catalog with
-     * the specified number of columns as IntFields indexed on the keyField.
+     * number of pages, assuming the path does not already exist. If the path
+     * exists, the file will be overwritten. The new table will be added to the
+     * Catalog with the specified number of columns as IntFields indexed on the
+     * keyField.
      */
     public static BTreeFile createEmptyBTreeFile(String path, int cols, int keyField, int pages)
             throws IOException {
         File f = new File(path);
-        BufferedOutputStream bw = new BufferedOutputStream(
-                new FileOutputStream(f, true));
+        BufferedOutputStream bw = new BufferedOutputStream(new FileOutputStream(f, true));
         byte[] emptyRootPtrData = BTreeRootPtrPage.createEmptyPageData();
         byte[] emptyPageData = BTreePage.createEmptyPageData();
         bw.write(emptyRootPtrData);
@@ -496,8 +507,8 @@ public class BTreeUtility {
     /**
      * Helper class that attempts to insert a tuple in a new thread
      *
-     * @return a handle to the Thread that will attempt insertion after it
-     *         has been started
+     * @return a handle to the Thread that will attempt insertion after it has been
+     *         started
      */
     public static class BTreeWriter extends Thread {
 
@@ -567,8 +578,8 @@ public class BTreeUtility {
         }
 
         /**
-         * @return an Exception instance if one occurred while inserting the tuple;
-         *         null otherwise
+         * @return an Exception instance if one occurred while inserting the tuple; null
+         *         otherwise
          */
         public Exception getError() {
             synchronized (elock) {
@@ -580,8 +591,8 @@ public class BTreeUtility {
     /**
      * Helper class that searches for tuple(s) in a new thread
      *
-     * @return a handle to the Thread that will attempt to search for tuple(s) after it
-     *         has been started
+     * @return a handle to the Thread that will attempt to search for tuple(s) after
+     *         it has been started
      */
     static class BTreeReader extends Thread {
 
@@ -595,7 +606,8 @@ public class BTreeUtility {
         final Object elock;
 
         /**
-         * @param tid   the transaction on whose behalf we want to search for the tuple(s)
+         * @param tid   the transaction on whose behalf we want to search for the
+         *              tuple(s)
          * @param bf    the B+ tree file containing the tuple(s)
          * @param f     the field to search for
          * @param count the number of tuples to search for
@@ -650,8 +662,8 @@ public class BTreeUtility {
         }
 
         /**
-         * @return an Exception instance if one occurred while searching for the tuple(s);
-         *         null otherwise
+         * @return an Exception instance if one occurred while searching for the
+         *         tuple(s); null otherwise
          */
         public Exception getError() {
             synchronized (elock) {
@@ -663,8 +675,8 @@ public class BTreeUtility {
     /**
      * Helper class that attempts to insert a tuple in a new thread
      *
-     * @return a handle to the Thread that will attempt insertion after it
-     *         has been started
+     * @return a handle to the Thread that will attempt insertion after it has been
+     *         started
      */
     public static class BTreeInserter extends Thread {
 
@@ -682,13 +694,14 @@ public class BTreeUtility {
          * @param tupdata        the data of the tuple to insert
          * @param insertedTuples the list of tuples that were successfully inserted
          */
-        public BTreeInserter(BTreeFile bf, int[] tupdata, BlockingQueue<List<Integer>> insertedTuples) {
+        public BTreeInserter(BTreeFile bf, int[] tupdata,
+                BlockingQueue<List<Integer>> insertedTuples) {
             init(bf, tupdata, insertedTuples);
         }
 
         public void run() {
             try {
-                System.out.println("Insert " + tid.getId());
+//                System.out.println("Insert " + tid.getId());
                 Tuple t = BTreeUtility.getBTreeTuple(tupdata);
                 Database.getBufferPool().insertTuple(tid, bf.getId(), t);
                 Database.getBufferPool().transactionComplete(tid);
@@ -697,7 +710,7 @@ public class BTreeUtility {
                 synchronized (slock) {
                     success = true;
                 }
-                System.out.println("Insert done " + tid.getId());
+                System.out.println("Insert done " + tid.getId() + " (" + tuple.get(0) + ", " + tuple.get(1) + ")");
             } catch (Exception e) {
                 System.out.println("Insert fail " + tid.getId());
                 if (!(e instanceof TransactionAbortedException)) {
@@ -711,7 +724,8 @@ public class BTreeUtility {
             }
         }
 
-        private void init(BTreeFile bf, int[] tupdata, BlockingQueue<List<Integer>> insertedTuples) {
+        private void init(BTreeFile bf, int[] tupdata,
+                BlockingQueue<List<Integer>> insertedTuples) {
             this.tid = new TransactionId();
             this.bf = bf;
             this.tupdata = tupdata;
@@ -722,7 +736,8 @@ public class BTreeUtility {
             this.elock = new Object();
         }
 
-        public void rerun(BTreeFile bf, int[] tupdata, BlockingQueue<List<Integer>> insertedTuples) {
+        public void rerun(BTreeFile bf, int[] tupdata,
+                BlockingQueue<List<Integer>> insertedTuples) {
             init(bf, tupdata, insertedTuples);
             run();
         }
@@ -737,8 +752,8 @@ public class BTreeUtility {
         }
 
         /**
-         * @return an Exception instance if one occurred while inserting the tuple;
-         *         null otherwise
+         * @return an Exception instance if one occurred while inserting the tuple; null
+         *         otherwise
          */
         public Exception getError() {
             synchronized (elock) {
@@ -750,8 +765,8 @@ public class BTreeUtility {
     /**
      * Helper class that attempts to delete tuple(s) in a new thread
      *
-     * @return a handle to the Thread that will attempt deletion after it
-     *         has been started
+     * @return a handle to the Thread that will attempt deletion after it has been
+     *         started
      */
     public static class BTreeDeleter extends Thread {
 
@@ -765,7 +780,8 @@ public class BTreeUtility {
         Object elock;
 
         /**
-         * @param bf             the B+ tree file from which we want to delete the tuple(s)
+         * @param bf             the B+ tree file from which we want to delete the
+         *                       tuple(s)
          * @param insertedTuples the list of tuples to delete
          */
         public BTreeDeleter(BTreeFile bf, BlockingQueue<List<Integer>> insertedTuples) {
@@ -774,7 +790,7 @@ public class BTreeUtility {
 
         public void run() {
             try {
-                System.out.println("Delete " + tid.getId());
+//                System.out.println("Delete " + tid.getId());
                 tuple = insertedTuples.take();
                 if (bf.getTupleDesc().numFields() != tuple.size()) {
                     throw new DbException("tuple desc mismatch");
@@ -782,10 +798,8 @@ public class BTreeUtility {
                 IntField key = new IntField(tuple.get(bf.keyField()));
                 IndexPredicate ipred = new IndexPredicate(Op.EQUALS, key);
                 DbFileIterator it = bf.indexIterator(tid, ipred);
-                System.out.println("Delete step A " + tid.getId());
                 it.open();
                 while (it.hasNext()) {
-                    System.out.println("Delete step A ing " + tid.getId());
                     Tuple t = it.next();
                     if (tupleToList(t).equals(tuple)) {
                         Database.getBufferPool().deleteTuple(tid, t);
@@ -793,14 +807,13 @@ public class BTreeUtility {
                     }
                 }
                 it.close();
-                System.out.println("Delete step B " + tid.getId());
                 Database.getBufferPool().transactionComplete(tid);
                 synchronized (slock) {
                     success = true;
                 }
-                System.out.println("Delete Done " + tid.getId());
+                System.out.println("Delete done " + tid.getId() + " (" + tuple.get(0) + ", " + tuple.get(1) + ")");
             } catch (Exception e) {
-                System.out.println("Delete Fail " + tid.getId());
+                System.out.println("Delete fail " + tid.getId() + " attempting (" + tuple.get(0) + ", " + tuple.get(1) + ")");
                 if (!(e instanceof TransactionAbortedException)) {
                     System.out.println("Something wrong: ");
                     e.printStackTrace();
@@ -843,8 +856,8 @@ public class BTreeUtility {
         }
 
         /**
-         * @return an Exception instance if one occurred while inserting the tuple;
-         *         null otherwise
+         * @return an Exception instance if one occurred while inserting the tuple; null
+         *         otherwise
          */
         public Exception getError() {
             synchronized (elock) {
@@ -854,4 +867,3 @@ public class BTreeUtility {
     }
 
 }
-

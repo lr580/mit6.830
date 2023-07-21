@@ -5,7 +5,7 @@ import simpledb.common.DbException;
 import simpledb.common.Debug;
 import simpledb.common.Permissions;
 import simpledb.execution.IndexPredicate;
-import simpledb.execution.Predicate;
+//import simpledb.execution.Predicate;
 import simpledb.execution.Predicate.Op;
 import simpledb.storage.*;
 import simpledb.transaction.TransactionAbortedException;
@@ -190,7 +190,7 @@ public class BTreeFile implements DbFile {
     private BTreeLeafPage findLeafPage(TransactionId tid, Map<PageId, Page> dirtypages,
             BTreePageId pid, Permissions perm, Field f)
             throws DbException, TransactionAbortedException {
-        // TODO: some code goes here
+        // DONE: some code goes here
 
         if (pid.pgcateg() == BTreePageId.LEAF) {
             return (BTreeLeafPage) getPage(tid, dirtypages, pid, perm);
@@ -211,13 +211,6 @@ public class BTreeFile implements DbFile {
             return null;
         }
         return findLeafPage(tid, dirtypages, entry.getRightChild(), perm, f);
-        /*
-         * int l = 1, r = page.getMaxEntries(), ans = r; while (l <= r) { int c = (l +
-         * r) >> 1; Field f2 = page.getKey(c); if (f2 == null ||
-         * f.compare(Predicate.Op.LESS_THAN_OR_EQ, f2)) { ans = c; r = c - 1; } else { l
-         * = c + 1; } } return findLeafPage(tid, dirtypages, page.getChildId(ans - 1),
-         * perm, f);
-         */
     }
 
     /**
@@ -1360,6 +1353,7 @@ class BTreeFileIterator extends AbstractDbFileIterator {
             if (nextp == null) {
                 curp = null;
             } else {
+                System.out.println("Next page " + nextp);
                 curp = (BTreeLeafPage) Database.getBufferPool().getPage(tid, nextp,
                         Permissions.READ_ONLY);
                 it = curp.iterator();
