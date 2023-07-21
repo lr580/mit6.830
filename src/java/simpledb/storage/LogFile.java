@@ -515,7 +515,7 @@ public class LogFile {
 
     private void writeToDisk(Page page) throws IOException {
         PageId pid = page.getId();
-        Database.getBufferPool().removePage(pid);
+//        Database.getBufferPool().removePage(pid);
         DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
         file.writePage(page);
     }
@@ -531,10 +531,8 @@ public class LogFile {
                 recoveryUndecided = false;
                 // DONE: some code goes here
 
-                
                 raf.seek(0);
                 long checkPoint = raf.readLong();
-                HashMap<Long, Long> transacionID = new HashMap<>();
                 if (checkPoint != -1) {
                     raf.seek(checkPoint);
                     raf.readInt();
@@ -542,14 +540,12 @@ public class LogFile {
                     int cnt = raf.readInt();
                     while (cnt > 0) {
                         cnt--;
-                        long tids = raf.readLong();
-                        long offset = raf.readLong();
-                        transacionID.put(tids, offset);
+                        raf.readLong();
+                        raf.readLong();
                     }
                     raf.readLong();
                 }
                 long checkPointOffset = raf.getFilePointer();
-//                HashMap<Long, List<Page>> oldMap = new HashMap<>();
                 HashSet<Long> commitSet = new HashSet<>();
                 while (true) {
                     try {
@@ -563,33 +559,8 @@ public class LogFile {
                             commitSet.add(tid);
                         }
                         raf.readLong();
-                    }catch (IOException e) {
+                    } catch (IOException e) {
                         break;
-                    }
-                }
-                Iterator<Long> iter = transacionID.keySet().iterator();
-                while (iter.hasNext()) {
-                    long tid = iter.next();
-                    if (!commitSet.contains(tid)) {
-                        continue;
-                    }
-                    long off = transacionID.get(tid);
-                    raf.seek(off);
-                    while (raf.getFilePointer() < checkPoint) {
-                        try {
-                            int type = raf.readInt();
-                            long tid2 = raf.readLong();
-                            if (type == UPDATE_RECORD) {
-                                Page old = readPageData(raf);
-                                readPageData(raf);
-                                if (tid2 == tid) {
-                                    writeToDisk(old);
-                                }
-                            }
-                            raf.readLong();
-                        }catch (IOException e) {
-                            break;
-                        }
                     }
                 }
                 raf.seek(checkPointOffset);
@@ -598,16 +569,15 @@ public class LogFile {
                         int type = raf.readInt();
                         long tid = raf.readLong();
                         if (type == UPDATE_RECORD) {
-                            Page old = readPageData(raf);
+                            readPageData(raf);
                             Page newPage = readPageData(raf);
                             if (commitSet.contains(tid)) {
                                 writeToDisk(newPage);
-                            } else {
-                                writeToDisk(old);
                             }
+// abort transaction never write update log                         
                         }
                         raf.readLong();
-                    }catch (IOException e) {
+                    } catch (IOException e) {
                         break;
                     }
                 }
