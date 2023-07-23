@@ -221,7 +221,9 @@ public class LogTest extends SimpleDbTestBase {
     @Test public void TestAbortCommitInterleaved()
             throws IOException, DbException, TransactionAbortedException {
         setup();
+        System.out.println("Insert 2 rows");
         doInsert(hf1, 1, 2);
+        System.out.println("Inserted 2 rows");
 
         // *** Test:
         // T1 start, T2 start and commit, T1 abort
@@ -233,12 +235,17 @@ public class LogTest extends SimpleDbTestBase {
         Transaction t2 = new Transaction();
         t2.start();
         insertRow(hf2, t2, 21);
+        System.out.println("Oops, checkpoint");
         Database.getLogFile().logCheckpoint();
+        System.out.println("checkpoint done");
         insertRow(hf2, t2, 22);
         t2.commit();
+        System.out.println("t2 commit");
 
         insertRow(hf1, t1, 4);
+        System.out.println("t1 aborting");
         abort(t1);
+        System.out.println("Aborted");
 
         Transaction t = new Transaction();
         t.start();
@@ -283,7 +290,7 @@ public class LogTest extends SimpleDbTestBase {
     @Test public void TestCommitAbortCommitCrash()
             throws IOException, DbException, TransactionAbortedException {
         setup();
-        doInsert(hf1, 1, 2);
+        doInsert(hf1, 1, 2); //0
 
         // *** Test:
         // T1 inserts and commits
@@ -291,9 +298,9 @@ public class LogTest extends SimpleDbTestBase {
         // T3 inserts and commit
         // only T1 and T3 data should be there
 
-        doInsert(hf1, 5, -1);
-        dontInsert(hf1, 6);
-        doInsert(hf1, 7, -1);
+        doInsert(hf1, 5, -1); //1
+        dontInsert(hf1, 6); //2
+        doInsert(hf1, 7, -1);//3
 
         Transaction t = new Transaction();
         t.start();
@@ -306,6 +313,7 @@ public class LogTest extends SimpleDbTestBase {
         // *** Test:
         // crash: should not change visible data
 
+        System.out.println("crash begin");
         crash();
 
         t = new Transaction();
@@ -373,6 +381,7 @@ public class LogTest extends SimpleDbTestBase {
         Database.getBufferPool().flushAllPages(); // XXX defeat NO-STEAL-based abort
         insertRow(hf2, t3, 25);
 
+        System.out.println("Crash begin");
         crash();
 
         Transaction t = new Transaction();
@@ -408,8 +417,10 @@ public class LogTest extends SimpleDbTestBase {
 
         // T2 commits
         doInsert(hf2, 26, 27);
-
+        
+        System.out.println("Going to checkpoint");
         Database.getLogFile().logCheckpoint();
+        System.out.println("check done");
 
         Transaction t3 = new Transaction();
         t3.start();
@@ -417,7 +428,9 @@ public class LogTest extends SimpleDbTestBase {
         Database.getBufferPool().flushAllPages(); // XXX defeat NO-STEAL-based abort
         insertRow(hf2, t3, 29);
 
+        System.out.println("Crash begin");
         crash();
+        System.out.println("recover done");
 
         Transaction t = new Transaction();
         t.start();

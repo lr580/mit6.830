@@ -557,6 +557,7 @@ public class BufferPool {
     private synchronized void flushPage(PageId pid) throws IOException {
         // DONE: some code goes here
         // not necessary for lab1
+        System.out.println("Flush " + pid);
         Page page = pages.get(pid);
         if (page == null) {// origin not in, nothing to flush
             return;

@@ -3,7 +3,6 @@ package simpledb.storage;
 import simpledb.common.Database;
 import simpledb.common.Debug;
 import simpledb.transaction.TransactionId;
-
 import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
@@ -212,6 +211,7 @@ public class LogFile {
          * record type transaction id before page data (see writePageData) after page
          * data start offset
          */
+        System.out.println("write " + tid.getId() + " " + raf.getFilePointer());
         raf.writeInt(UPDATE_RECORD);
         raf.writeLong(tid.getId());
 
@@ -300,6 +300,7 @@ public class LogFile {
      * @param tid The transaction that is beginning
      */
     public synchronized void logXactionBegin(TransactionId tid) throws IOException {
+//        System.out.println("add map " + tid.getId());
         Debug.log("BEGIN");
         if (tidToFirstLogRecord.get(tid.getId()) != null) {
             System.err.print("logXactionBegin: already began this tid\n");
@@ -471,20 +472,24 @@ public class LogFile {
             synchronized (this) {
                 preAppend();
                 // DONE: some code goes here
-
+//                System.out.println("Roll back");
                 long pos = tidToFirstLogRecord.get(tid.getId());
                 raf.seek(pos);
+                ArrayList<Page> pages = new ArrayList<>();
                 for (;;) {
                     try {
                         int type = raf.readInt();
                         long nowTid = raf.readLong();
+
                         if (type == UPDATE_RECORD) {
                             Page page = readPageData(raf); // before image
                             readPageData(raf); // after image
                             if (tid.getId() == nowTid) {
-                                writeToDisk(page);
+//                                System.out.println("roll old");
+                                pages.add(page);
                             }
                         } else if (type == CHECKPOINT_RECORD) {
+//                            System.out.println("meet checkpoint");
                             for (int i = 0, n = raf.readInt(); i < n; ++i) {
                                 raf.readLong();// transaction id
                                 raf.readLong();// seek position
@@ -495,6 +500,10 @@ public class LogFile {
                         break;
                     }
                 }
+                for (int i = pages.size() - 1; i >= 0; --i) {
+                    writeToDisk(pages.get(i));
+                }
+//                System.out.println("roll back done");
             }
         }
     }
@@ -515,7 +524,7 @@ public class LogFile {
 
     private void writeToDisk(Page page) throws IOException {
         PageId pid = page.getId();
-//        Database.getBufferPool().removePage(pid);
+        Database.getBufferPool().removePage(pid);
         DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
         file.writePage(page);
     }
@@ -533,6 +542,10 @@ public class LogFile {
 
                 raf.seek(0);
                 long checkPoint = raf.readLong();
+                HashMap<Long, Long> transacionID = new HashMap<>();
+                long earliest = checkPoint;
+                System.out.println("cp " + checkPoint);
+                long checkPointOffset = raf.getFilePointer();
                 if (checkPoint != -1) {
                     raf.seek(checkPoint);
                     raf.readInt();
@@ -540,13 +553,48 @@ public class LogFile {
                     int cnt = raf.readInt();
                     while (cnt > 0) {
                         cnt--;
-                        raf.readLong();
-                        raf.readLong();
+                        long tids = raf.readLong();
+                        long offset = raf.readLong();
+                        transacionID.put(tids, offset);
+                        if (offset >= 0) {
+                            earliest = Math.min(earliest, offset);
+                        }
                     }
                     raf.readLong();
+                    checkPointOffset = raf.getFilePointer();
+                } else {
+                    while (true) {
+                        try {
+                            int type = raf.readInt();
+                            long tid = raf.readLong();
+                            if (type == UPDATE_RECORD) {
+                                readPageData(raf);
+                                readPageData(raf);
+                            }
+                            raf.readLong();
+                            if (type == BEGIN_RECORD) {
+                                System.out.println("begin " + tid + " " + raf.getFilePointer());
+                                transacionID.put(tid, raf.getFilePointer());
+                            }
+                            if (type == COMMIT_RECORD) {
+                                System.out.println("finish " + tid); 
+                                transacionID.remove(tid);
+                            }
+                            if (type == ABORT_RECORD) {
+                                transacionID.remove(tid);
+                            }
+                        } catch (IOException e) {
+                            break;
+                        }
+                        checkPoint = Long.MAX_VALUE;
+                        checkPointOffset = raf.getFilePointer();
+                    }
                 }
-                long checkPointOffset = raf.getFilePointer();
+                System.out.println("Unfinish trans " + transacionID.size());
+                
+//                HashMap<Long, List<Page>> oldMap = new HashMap<>();
                 HashSet<Long> commitSet = new HashSet<>();
+
                 while (true) {
                     try {
                         int type = raf.readInt();
@@ -563,18 +611,68 @@ public class LogFile {
                         break;
                     }
                 }
+//                raf.seek(earliest);
+//                while (raf.getFilePointer() < checkPoint) {
+//                    try {
+//                      int type = raf.readInt();
+//                      long tid = raf.readLong();
+//                      if (type == UPDATE_RECORD) {
+//                          Page old = readPageData(raf);
+//                          readPageData(raf);
+//                          if (!commitSet.contains(tid) && transacionID.containsKey(tid)) {
+//                              writeToDisk(old);
+//                          }
+//                      }
+//                      raf.readLong();
+//                  }catch (IOException e) {
+//                      break;
+//                  }
+//                }
+                Iterator<Long> iter = transacionID.keySet().iterator();
+                while (iter.hasNext()) {
+                    long tid = iter.next();
+                    if (commitSet.contains(tid)) { // commit
+                        continue;
+                    }
+                    System.out.println("Let map " + tid);
+                    long off = transacionID.get(tid);
+                    raf.seek(off);
+                    ArrayList<Page> pages = new ArrayList<>();
+                    while (raf.getFilePointer() < checkPoint) {
+                        try {
+                            int type = raf.readInt();
+                            long tid2 = raf.readLong();
+                            if (type == UPDATE_RECORD) {
+                                Page old = readPageData(raf);
+                                readPageData(raf);
+                                if (tid2 == tid) {
+                                    System.out.println("recover abort " + tid + " " + old.getId());
+//                                    writeToDisk(old);
+                                    pages.add(old);
+                                }
+                            }
+                            raf.readLong();
+                        } catch (IOException e) {
+                            break;
+                        }
+                    }
+                    for (int i = pages.size() - 1; i >= 0; --i) {
+                        writeToDisk(pages.get(i));
+                    }
+                }
                 raf.seek(checkPointOffset);
                 while (true) {
                     try {
                         int type = raf.readInt();
                         long tid = raf.readLong();
                         if (type == UPDATE_RECORD) {
-                            readPageData(raf);
+                            Page old = readPageData(raf);
                             Page newPage = readPageData(raf);
                             if (commitSet.contains(tid)) {
                                 writeToDisk(newPage);
+                            } else {
+                                writeToDisk(old);
                             }
-// abort transaction never write update log                         
                         }
                         raf.readLong();
                     } catch (IOException e) {
