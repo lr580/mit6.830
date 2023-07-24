@@ -1353,7 +1353,7 @@ class BTreeFileIterator extends AbstractDbFileIterator {
             if (nextp == null) {
                 curp = null;
             } else {
-                System.out.println("Next page " + nextp);
+//                System.out.println("Next page " + nextp);
                 curp = (BTreeLeafPage) Database.getBufferPool().getPage(tid, nextp,
                         Permissions.READ_ONLY);
                 it = curp.iterator();
