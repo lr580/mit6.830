@@ -95,7 +95,7 @@ public class IntHistogram implements Histogram {
             double res = 1.0 * (br - v) / w;
             res *= 1.0 * cnt[i] / ntups;
             for (int j = i + 1; j < numb; ++j) {
-                res += 1.0 * cnt[j] / w / ntups;
+                res += 1.0 * cnt[j] / ntups;
             }
             return res;
         }
